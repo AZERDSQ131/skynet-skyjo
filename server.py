@@ -57,7 +57,7 @@ def get_policy_for_level(level):
     cached = _level_cache.get(level)
     if cached is None or cached[1] != mtime:
         net = ActorCriticNet(OBS_DIM, N_ACTIONS).to(DEVICE)
-        net.load_state_dict(torch.load(path, map_location=DEVICE))
+        net.load_state_dict(torch.load(path, map_location=DEVICE), strict=False)
         net.eval()
         _level_cache[level] = (net, mtime)
         print(f"Niveau {level} (re)chargé depuis {path}")

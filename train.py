@@ -62,6 +62,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--entropy-start", type=float, default=0.02)
     parser.add_argument("--entropy-end", type=float, default=0.002)
+    parser.add_argument("--rank-coef", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--checkpoint", type=str, default="checkpoints/skynet.pt")
     parser.add_argument("--checkpoint-every", type=int, default=50)
@@ -85,8 +86,11 @@ def main():
 
     if args.resume and os.path.exists(args.checkpoint):
         try:
-            policy.load_state_dict(torch.load(args.checkpoint, map_location=device))
-            print(f"Reprise depuis {args.checkpoint}")
+            result = policy.load_state_dict(torch.load(args.checkpoint, map_location=device), strict=False)
+            print(
+                f"Reprise depuis {args.checkpoint} "
+                f"(clés manquantes réinitialisées: {result.missing_keys})"
+            )
         except RuntimeError as e:
             print(f"Impossible de reprendre ({e}); démarrage à neuf avec la nouvelle architecture.")
 
@@ -105,7 +109,7 @@ def main():
         stats = ppo_update(
             policy, optimizer, samples, device,
             clip_eps=args.clip_eps, epochs=args.epochs, batch_size=args.batch_size,
-            ent_coef=ent_coef,
+            ent_coef=ent_coef, rank_coef=args.rank_coef,
         )
         dt = time.time() - t0
 
@@ -113,8 +117,8 @@ def main():
         print(
             f"it={it:5d} | ep/iter={args.episodes_per_iter} | "
             f"avg_score={avg_score:6.2f} | policy_loss={stats['policy_loss']:+.4f} | "
-            f"value_loss={stats['value_loss']:.4f} | entropy={stats['entropy']:.3f} | "
-            f"ent_coef={ent_coef:.4f} | {dt:.1f}s"
+            f"value_loss={stats['value_loss']:.4f} | rank_loss={stats['rank_loss']:.4f} | "
+            f"entropy={stats['entropy']:.3f} | ent_coef={ent_coef:.4f} | {dt:.1f}s"
         )
 
         if it % args.eval_every == 0:

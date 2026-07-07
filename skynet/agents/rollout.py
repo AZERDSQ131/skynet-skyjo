@@ -36,6 +36,9 @@ def collect_episode(policy, device, gamma=0.99, lam=0.95, rng=None):
         env.step(a)
 
     rewards = env.terminal_rewards()
+    sorted_scores = sorted(env.scores)
+    ranks = {p: sorted_scores.index(env.scores[p]) for p in range(env.n_players)}
+
     samples = []
     for p, traj in trajectories.items():
         T = len(traj["obs"])
@@ -62,6 +65,8 @@ def collect_episode(policy, device, gamma=0.99, lam=0.95, rng=None):
                     "logprob": traj["logprob"][t],
                     "advantage": advantages[t],
                     "return": returns[t],
+                    "rank": ranks[p],
+                    "n_players": env.n_players,
                 }
             )
 
@@ -87,4 +92,6 @@ def samples_to_tensors(samples, device):
     old_logprob = torch.as_tensor([s["logprob"] for s in samples], dtype=torch.float32, device=device)
     advantage = torch.as_tensor([s["advantage"] for s in samples], dtype=torch.float32, device=device)
     ret = torch.as_tensor([s["return"] for s in samples], dtype=torch.float32, device=device)
-    return obs, mask, action, old_logprob, advantage, ret
+    rank = torch.as_tensor([s["rank"] for s in samples], dtype=torch.long, device=device)
+    n_players = torch.as_tensor([s["n_players"] for s in samples], dtype=torch.long, device=device)
+    return obs, mask, action, old_logprob, advantage, ret, rank, n_players

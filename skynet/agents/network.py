@@ -8,7 +8,7 @@ NEG_INF = -1e9
 
 
 class ActorCriticNet(nn.Module):
-    def __init__(self, obs_dim, action_dim, hidden_dim=512):
+    def __init__(self, obs_dim, action_dim, hidden_dim=512, max_players=8):
         super().__init__()
         self.trunk = nn.Sequential(
             nn.Linear(obs_dim, hidden_dim),
@@ -20,6 +20,11 @@ class ActorCriticNet(nn.Module):
         )
         self.policy_head = nn.Linear(hidden_dim, action_dim)
         self.value_head = nn.Linear(hidden_dim, 1)
+        # Tête auxiliaire : prédit le classement final (0 = premier) à partir
+        # de l'état courant. Ne sert qu'à enrichir le signal d'entraînement
+        # (voir ppo.py) ; ignorée à l'inférence (forward() ne la retourne pas,
+        # donc aucun appelant existant n'a besoin de changer).
+        self.rank_head = nn.Linear(hidden_dim, max_players)
 
     def forward(self, obs):
         h = self.trunk(obs)
@@ -42,9 +47,14 @@ class ActorCriticNet(nn.Module):
         return action, log_prob, value
 
     def evaluate(self, obs, action_mask, action):
-        """Utilisé pendant l'update PPO (avec gradient)."""
-        logits, value = self.forward(obs)
+        """Utilisé pendant l'update PPO (avec gradient). Calcule aussi les
+        logits de classement (tête auxiliaire), utilisés uniquement par
+        `ppo.py` pour une perte supplémentaire."""
+        h = self.trunk(obs)
+        logits = self.policy_head(h)
+        value = self.value_head(h).squeeze(-1)
+        rank_logits = self.rank_head(h)
         dist = self._masked_dist(logits, action_mask)
         log_prob = dist.log_prob(action)
         entropy = dist.entropy()
-        return log_prob, entropy, value
+        return log_prob, entropy, value, rank_logits
