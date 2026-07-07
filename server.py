@@ -39,29 +39,29 @@ def _variant(vid, dir_, file_, label, stats):
 
 VARIANTS = {
     "beginner": [
-        _variant("v2", "levels", "level_1.pt", "v2",
+        _variant("v2", "levels", "level_1.pt", "Genesis 2",
                   {"win_rate": 0.573, "avg_score": 44.77, "avg_placement": 0.55}),
-        _variant("v3", "levels_v3", "level_1.pt", "v3",
+        _variant("v3", "levels_v3", "level_1.pt", "Horizon 3",
                   {"win_rate": 0.687, "avg_score": 43.53, "avg_placement": 0.46}),
     ],
     "intermediate": [
-        _variant("v2", "levels", "level_2.pt", "v2",
+        _variant("v2", "levels", "level_2.pt", "Genesis 2",
                   {"win_rate": 0.867, "avg_score": 35.47, "avg_placement": 0.17}),
-        _variant("v3", "levels_v3", "level_2.pt", "v3",
+        _variant("v3", "levels_v3", "level_2.pt", "Horizon 3",
                   {"win_rate": 0.907, "avg_score": 32.90, "avg_placement": 0.10}),
     ],
     "advanced": [
-        _variant("v2", "levels", "level_3.pt", "v2",
+        _variant("v2", "levels", "level_3.pt", "Genesis 2",
                   {"win_rate": 0.980, "avg_score": 21.39, "avg_placement": 0.02}),
-        _variant("v3", "levels_v3", "level_3.pt", "v3",
+        _variant("v3", "levels_v3", "level_3.pt", "Horizon 3",
                   {"win_rate": 0.973, "avg_score": 24.30, "avg_placement": 0.03}),
     ],
     "expert": [
-        _variant("v2", "levels", "level_4.pt", "v2 (raffiné)",
+        _variant("v2", "levels", "level_4.pt", "Genesis 2",
                   {"win_rate": 0.980, "avg_score": 17.75, "avg_placement": 0.02}),
-        _variant("v3", "levels_v3", "level_4.pt", "v3",
+        _variant("v3", "levels_v3", "level_4.pt", "Horizon 3",
                   {"win_rate": 0.987, "avg_score": 19.89, "avg_placement": 0.01}),
-        _variant("v4", "levels_v4", "level_4.pt", "v4 (+ classement)",
+        _variant("v4", "levels_v4", "level_4.pt", "Singularité 4",
                   {"win_rate": 0.993, "avg_score": 18.49, "avg_placement": 0.01}),
     ],
 }
@@ -71,6 +71,7 @@ DEFAULT_SLIDER_CONFIG = {
     "intermediate": ["v3"],
     "advanced": ["v2"],
     "expert": ["v2", "v3"],
+    "expert_plus": True,
 }
 
 app = Flask(__name__, static_folder="static", static_url_path="")
@@ -96,10 +97,14 @@ def load_slider_config():
                 valid_ids = {v["id"] for v in VARIANTS[tier]}
                 ordered = [i for i in cfg.get(tier, []) if i in valid_ids]
                 out[tier] = ordered or list(DEFAULT_SLIDER_CONFIG[tier])
+            out["expert_plus"] = bool(cfg.get("expert_plus", DEFAULT_SLIDER_CONFIG["expert_plus"]))
             return out
         except (json.JSONDecodeError, OSError):
             pass
-    return {tier: list(ids) for tier, ids in DEFAULT_SLIDER_CONFIG.items()}
+    return {
+        **{tier: list(ids) for tier, ids in DEFAULT_SLIDER_CONFIG.items() if tier in TIERS},
+        "expert_plus": DEFAULT_SLIDER_CONFIG["expert_plus"],
+    }
 
 
 def save_slider_config(cfg):
@@ -130,7 +135,11 @@ def build_level_meta(slider_config):
     # expectimax.py importe directement l'observation courante (skyjo_env.observe) ;
     # Expert+ n'a donc de sens que pour une variante qui partage cette même
     # architecture d'observation (obs_dim == OBS_DIM courant).
-    if last_expert_variant is not None and last_expert_variant["obs_dim"] == OBS_DIM:
+    if (
+        slider_config.get("expert_plus", True)
+        and last_expert_variant is not None
+        and last_expert_variant["obs_dim"] == OBS_DIM
+    ):
         path = os.path.join(CHECKPOINTS_ROOT, last_expert_variant["dir"], last_expert_variant["file"])
         meta.append({
             "level": len(meta), "label": "Expert+ (calcul)", "path": path,
@@ -365,6 +374,7 @@ def set_slider_config():
             requested = []
         ordered = [i for i in requested if i in valid_ids]
         new_cfg[tier] = ordered or list(DEFAULT_SLIDER_CONFIG[tier])
+    new_cfg["expert_plus"] = bool(data.get("expert_plus", True))
     SLIDER_CONFIG = new_cfg
     save_slider_config(SLIDER_CONFIG)
     LEVEL_META = build_level_meta(SLIDER_CONFIG)

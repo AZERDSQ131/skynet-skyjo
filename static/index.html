@@ -1034,7 +1034,22 @@ function renderSettingsPanel() {
           <tbody>${rows}</tbody>
         </table>
       </div>`;
-  }).join('');
+  }).join('') + `
+      <div class="tier-block">
+        <h3>Expert+ (calcul)</h3>
+        <table class="variant-table">
+          <tbody>
+            <tr>
+              <td>
+                <label>
+                  <input type="checkbox" id="expert-plus-checkbox" ${sliderOptions.config.expert_plus ? 'checked' : ''}>
+                  Activer Expert+ (couche de décision expectimax, appliquée à la dernière variante Expert cochée)
+                </label>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
 }
 
 async function openSettings() {
@@ -1054,6 +1069,7 @@ $('settings-save').addEventListener('click', async () => {
   for (const tier of TIER_ORDER) {
     cfg[tier] = Array.from(container_checked(tier));
   }
+  cfg.expert_plus = $('expert-plus-checkbox').checked;
   await api('/api/slider_config', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(cfg),
