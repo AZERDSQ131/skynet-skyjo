@@ -14,6 +14,7 @@ donner de mauvais résultats silencieusement).
 | `level_2.pt` | Intermédiaire | Run `train_v2`, itération 250/1400 |
 | `level_3.pt` | Avancé | Run `train_v2`, itération 600/1400 |
 | `level_4.pt` | Expert | Run `train_v2`, itération 1400/1400, puis raffiné par un run `train_refine` (700 itérations supplémentaires, entropie basse, repris depuis ce même checkpoint) |
+| `level_4.pt` (même fichier) | Expert+ (calcul) | Mêmes poids qu'Expert — pas de réseau ni d'entraînement séparés. La différence est la procédure de décision : `skynet/agents/expectimax.py` évalue chaque issue incertaine (retourner/piocher/défausser) par une espérance pondérée sur les vraies probabilités de tirage (comptage de cartes), en utilisant la tête de valeur déjà entraînée, plutôt qu'un simple argmax sur les logits. |
 
 `../skynet.pt` est le checkpoint "courant" qui s'écrase à chaque
 sauvegarde périodique pendant l'entraînement (`--checkpoint-every`) ;
