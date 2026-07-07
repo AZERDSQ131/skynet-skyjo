@@ -1,5 +1,6 @@
 """Serveur local Flask : interface web pour affronter Skynet."""
 
+import json
 import os
 import random
 
@@ -10,18 +11,67 @@ from skynet.agents.expectimax import choose_action as choose_action_expectimax
 from skynet.agents.network import ActorCriticNet
 from skynet.env.game import SkyjoGame, HIDDEN, REMOVED
 from skynet.env.skyjo_env import OBS_DIM, N_ACTIONS, observe, legal_action_mask
+from skynet.env import legacy_v2_obs
 
 DEVICE = torch.device("cpu")
-LEVELS_DIR = os.environ.get("SKYNET_LEVELS_DIR", "checkpoints/levels")
+CHECKPOINTS_ROOT = os.environ.get("SKYNET_CHECKPOINTS_ROOT", "checkpoints")
+SLIDER_CONFIG_PATH = os.path.join(CHECKPOINTS_ROOT, "levels", "slider_config.json")
 
-LEVEL_META = [
-    {"level": 0, "label": "Aléatoire", "file": None, "expectimax": False},
-    {"level": 1, "label": "Débutant", "file": "level_1.pt", "expectimax": False},
-    {"level": 2, "label": "Intermédiaire", "file": "level_2.pt", "expectimax": False},
-    {"level": 3, "label": "Avancé", "file": "level_3.pt", "expectimax": False},
-    {"level": 4, "label": "Expert", "file": "level_4.pt", "expectimax": False},
-    {"level": 5, "label": "Expert+ (calcul)", "file": "level_4.pt", "expectimax": True},
-]
+TIERS = ["beginner", "intermediate", "advanced", "expert"]
+TIER_LABELS = {
+    "beginner": "Débutant",
+    "intermediate": "Intermédiaire",
+    "advanced": "Avancé",
+    "expert": "Expert",
+}
+
+# Variantes disponibles par palier, avec leurs benchmarks (150 parties vs
+# adversaire aléatoire, seed=42, cf. checkpoints/levels/README.md pour le
+# détail des runs d'entraînement correspondants).
+def _variant(vid, dir_, file_, label, stats):
+    is_v2 = vid == "v2"
+    return {
+        "id": vid, "dir": dir_, "file": file_, "label": label, "stats": stats,
+        "obs_dim": legacy_v2_obs.OBS_DIM if is_v2 else OBS_DIM,
+        "observe": legacy_v2_obs.observe if is_v2 else observe,
+    }
+
+
+VARIANTS = {
+    "beginner": [
+        _variant("v2", "levels", "level_1.pt", "v2",
+                  {"win_rate": 0.573, "avg_score": 44.77, "avg_placement": 0.55}),
+        _variant("v3", "levels_v3", "level_1.pt", "v3",
+                  {"win_rate": 0.687, "avg_score": 43.53, "avg_placement": 0.46}),
+    ],
+    "intermediate": [
+        _variant("v2", "levels", "level_2.pt", "v2",
+                  {"win_rate": 0.867, "avg_score": 35.47, "avg_placement": 0.17}),
+        _variant("v3", "levels_v3", "level_2.pt", "v3",
+                  {"win_rate": 0.907, "avg_score": 32.90, "avg_placement": 0.10}),
+    ],
+    "advanced": [
+        _variant("v2", "levels", "level_3.pt", "v2",
+                  {"win_rate": 0.980, "avg_score": 21.39, "avg_placement": 0.02}),
+        _variant("v3", "levels_v3", "level_3.pt", "v3",
+                  {"win_rate": 0.973, "avg_score": 24.30, "avg_placement": 0.03}),
+    ],
+    "expert": [
+        _variant("v2", "levels", "level_4.pt", "v2 (raffiné)",
+                  {"win_rate": 0.980, "avg_score": 17.75, "avg_placement": 0.02}),
+        _variant("v3", "levels_v3", "level_4.pt", "v3",
+                  {"win_rate": 0.987, "avg_score": 19.89, "avg_placement": 0.01}),
+        _variant("v4", "levels_v4", "level_4.pt", "v4 (+ classement)",
+                  {"win_rate": 0.993, "avg_score": 18.49, "avg_placement": 0.01}),
+    ],
+}
+
+DEFAULT_SLIDER_CONFIG = {
+    "beginner": ["v3"],
+    "intermediate": ["v3"],
+    "advanced": ["v2"],
+    "expert": ["v2", "v3"],
+}
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -36,32 +86,89 @@ STATE = {
 _level_cache = {}  # level -> (net, mtime)
 
 
+def load_slider_config():
+    if os.path.exists(SLIDER_CONFIG_PATH):
+        try:
+            with open(SLIDER_CONFIG_PATH) as f:
+                cfg = json.load(f)
+            out = {}
+            for tier in TIERS:
+                valid_ids = {v["id"] for v in VARIANTS[tier]}
+                ordered = [i for i in cfg.get(tier, []) if i in valid_ids]
+                out[tier] = ordered or list(DEFAULT_SLIDER_CONFIG[tier])
+            return out
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {tier: list(ids) for tier, ids in DEFAULT_SLIDER_CONFIG.items()}
+
+
+def save_slider_config(cfg):
+    os.makedirs(os.path.dirname(SLIDER_CONFIG_PATH), exist_ok=True)
+    with open(SLIDER_CONFIG_PATH, "w") as f:
+        json.dump(cfg, f, indent=2)
+
+
+def build_level_meta(slider_config):
+    meta = [{"level": 0, "label": "Aléatoire", "path": None, "obs_dim": None, "observe": None, "expectimax": False}]
+    last_expert_variant = None
+    for tier in TIERS:
+        enabled = slider_config.get(tier, [])
+        show_variant_name = len(enabled) > 1
+        for vid in enabled:
+            variant = next((v for v in VARIANTS[tier] if v["id"] == vid), None)
+            if variant is None:
+                continue
+            path = os.path.join(CHECKPOINTS_ROOT, variant["dir"], variant["file"])
+            label = f"{TIER_LABELS[tier]} ({variant['label']})" if show_variant_name else TIER_LABELS[tier]
+            meta.append({
+                "level": len(meta), "label": label, "path": path,
+                "obs_dim": variant["obs_dim"], "observe": variant["observe"],
+                "expectimax": False,
+            })
+            if tier == "expert":
+                last_expert_variant = variant
+    # expectimax.py importe directement l'observation courante (skyjo_env.observe) ;
+    # Expert+ n'a donc de sens que pour une variante qui partage cette même
+    # architecture d'observation (obs_dim == OBS_DIM courant).
+    if last_expert_variant is not None and last_expert_variant["obs_dim"] == OBS_DIM:
+        path = os.path.join(CHECKPOINTS_ROOT, last_expert_variant["dir"], last_expert_variant["file"])
+        meta.append({
+            "level": len(meta), "label": "Expert+ (calcul)", "path": path,
+            "obs_dim": last_expert_variant["obs_dim"], "observe": last_expert_variant["observe"],
+            "expectimax": True,
+        })
+    return meta
+
+
+SLIDER_CONFIG = load_slider_config()
+LEVEL_META = build_level_meta(SLIDER_CONFIG)
+
+
 def available_levels():
     out = []
     for meta in LEVEL_META:
-        if meta["file"] is None:
-            out.append({"level": meta["level"], "label": meta["label"]})
-            continue
-        path = os.path.join(LEVELS_DIR, meta["file"])
-        if os.path.exists(path):
+        if meta["path"] is None or os.path.exists(meta["path"]):
             out.append({"level": meta["level"], "label": meta["label"]})
     return out
 
 
 def get_policy_for_level(level):
-    if level == 0:
+    if level < 0 or level >= len(LEVEL_META):
         return None
     meta = LEVEL_META[level]
-    path = os.path.join(LEVELS_DIR, meta["file"])
+    if meta["path"] is None:
+        return None
+    path = meta["path"]
     mtime = os.path.getmtime(path)
-    cached = _level_cache.get(level)
+    cache_key = (level, path)
+    cached = _level_cache.get(cache_key)
     if cached is None or cached[1] != mtime:
-        net = ActorCriticNet(OBS_DIM, N_ACTIONS).to(DEVICE)
+        net = ActorCriticNet(meta["obs_dim"], N_ACTIONS).to(DEVICE)
         net.load_state_dict(torch.load(path, map_location=DEVICE), strict=False)
         net.eval()
-        _level_cache[level] = (net, mtime)
+        _level_cache[cache_key] = (net, mtime)
         print(f"Niveau {level} (re)chargé depuis {path}")
-    return _level_cache[level][0]
+    return _level_cache[cache_key][0]
 
 
 def ai_action(game, player):
@@ -72,10 +179,11 @@ def ai_action(game, player):
     if net is None:
         return STATE["rng"].choice(legal)
 
-    if LEVEL_META[level].get("expectimax"):
+    meta = LEVEL_META[level]
+    if meta.get("expectimax"):
         return choose_action_expectimax(game, player, net, device=DEVICE)
 
-    obs = observe(game, player)
+    obs = meta["observe"](game, player)
     mask = legal_action_mask(game)
     obs_t = torch.as_tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
     mask_t = torch.as_tensor(mask, dtype=torch.bool, device=DEVICE).unsqueeze(0)
@@ -225,6 +333,45 @@ def levels():
     return jsonify(available_levels())
 
 
+@app.route("/api/slider_options")
+def slider_options():
+    variants_with_availability = {}
+    for tier in TIERS:
+        items = []
+        for v in VARIANTS[tier]:
+            path = os.path.join(CHECKPOINTS_ROOT, v["dir"], v["file"])
+            items.append({
+                "id": v["id"], "label": v["label"], "stats": v["stats"],
+                "available": os.path.exists(path),
+            })
+        variants_with_availability[tier] = items
+    return jsonify({
+        "tiers": TIERS,
+        "tier_labels": TIER_LABELS,
+        "variants": variants_with_availability,
+        "config": SLIDER_CONFIG,
+    })
+
+
+@app.route("/api/slider_config", methods=["POST"])
+def set_slider_config():
+    global SLIDER_CONFIG, LEVEL_META
+    data = request.get_json(force=True) or {}
+    new_cfg = {}
+    for tier in TIERS:
+        valid_ids = {v["id"] for v in VARIANTS[tier]}
+        requested = data.get(tier, [])
+        if not isinstance(requested, list):
+            requested = []
+        ordered = [i for i in requested if i in valid_ids]
+        new_cfg[tier] = ordered or list(DEFAULT_SLIDER_CONFIG[tier])
+    SLIDER_CONFIG = new_cfg
+    save_slider_config(SLIDER_CONFIG)
+    LEVEL_META = build_level_meta(SLIDER_CONFIG)
+    _level_cache.clear()
+    return jsonify({"ok": True, "levels": available_levels()})
+
+
 @app.route("/api/new_game", methods=["POST"])
 def new_game():
     data = request.get_json(force=True) or {}
@@ -346,12 +493,13 @@ def advise():
     level = level if level in valid_levels else 0
     net = get_policy_for_level(level)
 
+    meta = LEVEL_META[level]
     if net is None:
         action = random.choice(legal)
-    elif LEVEL_META[level].get("expectimax"):
+    elif meta.get("expectimax"):
         action = choose_action_expectimax(game, 0, net, device=DEVICE)
     else:
-        obs = observe(game, 0)
+        obs = meta["observe"](game, 0)
         mask = legal_action_mask(game)
         obs_t = torch.as_tensor(obs, dtype=torch.float32, device=DEVICE).unsqueeze(0)
         mask_t = torch.as_tensor(mask, dtype=torch.bool, device=DEVICE).unsqueeze(0)

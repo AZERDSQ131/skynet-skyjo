@@ -112,6 +112,7 @@
   .mode-toggle button:active { transform: translateY(1px); }
   .mode-toggle button.active#mode-play { background: var(--green); border-color: #1d7a37; color: #fff; box-shadow: 0 4px 0 #1d7a37; }
   .mode-toggle button.active#mode-cheat { background: var(--red); border-color: #a5372a; color: #fff; box-shadow: 0 4px 0 #a5372a; }
+  .mode-toggle button#settings-btn { flex: 0 0 auto; font-size: 15px; padding: 10px 16px; }
 
 
   /* ---- power slider (niveau de conseil) : piste pilule + trame de points ---- */
@@ -368,6 +369,27 @@
   #podium li { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 10px; font-weight: 700; }
   #podium li:nth-child(1) { background: #fff6de; }
   #podium li.you { color: #1d7a37; }
+
+  /* ---- panneau de réglages (choix des variantes par palier) ---- */
+  #settings-overlay { display: none; position: fixed; inset: 0; z-index: 90; background: rgba(43,38,32,.55); align-items: center; justify-content: center; padding: 20px; }
+  #settings-card {
+    background: var(--panel); border-radius: 22px; padding: 26px 30px; box-shadow: 0 8px 0 var(--line);
+    max-width: 640px; width: 100%; max-height: 84vh; overflow-y: auto;
+  }
+  #settings-card h2 { margin-top: 0; }
+  #settings-card p.hint { color: var(--muted); font-size: 14px; margin-top: -6px; }
+  .tier-block { margin-bottom: 20px; }
+  .tier-block h3 { margin: 0 0 8px; font-size: 16px; }
+  .variant-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .variant-table th { text-align: left; color: var(--muted); font-weight: 700; padding: 4px 8px; border-bottom: 2px solid var(--line); }
+  .variant-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  .variant-table tr:last-child td { border-bottom: none; }
+  .variant-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .variant-table label { display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; }
+  .variant-table input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--green); cursor: pointer; }
+  .variant-table tr.unavailable { opacity: .4; }
+  .variant-table tr.unavailable label { cursor: not-allowed; }
+  #settings-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
 </style>
 
 <div class="app">
@@ -382,6 +404,7 @@
   <div class="mode-toggle">
     <button id="mode-play" class="active">🎮 Jouer</button>
     <button id="mode-cheat">🕵️ Triche</button>
+    <button id="settings-btn" title="Réglages des niveaux">⚙️ Réglages</button>
   </div>
 
   <div id="play-view">
@@ -500,6 +523,18 @@
     <h2>🏁 Manche terminée</h2>
     <ol id="podium"></ol>
     <button class="cta" id="restart-btn">Rejouer</button>
+  </div>
+</div>
+
+<div id="settings-overlay">
+  <div id="settings-card">
+    <h2>⚙️ Réglages des niveaux</h2>
+    <p class="hint">Choisis quelles variantes apparaissent sur le curseur de niveau, palier par palier. Les chiffres viennent d'une évaluation contre un adversaire aléatoire (150 parties, même graine).</p>
+    <div id="settings-tiers"></div>
+    <div id="settings-actions">
+      <button class="cta ghost" id="settings-cancel">Annuler</button>
+      <button class="cta" id="settings-save">Enregistrer</button>
+    </div>
   </div>
 </div>
 
@@ -966,6 +1001,70 @@ async function refreshLevels() {
       cheatPowerSlider.setIndex(levels.length - 1);
     }
   } catch (e) { /* le serveur n'est peut-être pas encore prêt */ }
+}
+
+const TIER_ORDER = ['beginner', 'intermediate', 'advanced', 'expert'];
+let sliderOptions = null;
+
+function pct(x) { return (x * 100).toFixed(1) + '%'; }
+
+function renderSettingsPanel() {
+  const container = $('settings-tiers');
+  container.innerHTML = TIER_ORDER.map(tier => {
+    const label = sliderOptions.tier_labels[tier];
+    const enabled = new Set(sliderOptions.config[tier] || []);
+    const rows = sliderOptions.variants[tier].map(v => `
+      <tr class="${v.available ? '' : 'unavailable'}" data-tier="${tier}" data-id="${v.id}">
+        <td>
+          <label>
+            <input type="checkbox" ${enabled.has(v.id) ? 'checked' : ''} ${v.available ? '' : 'disabled'}
+                   data-tier="${tier}" data-id="${v.id}">
+            ${v.label}
+          </label>
+        </td>
+        <td class="num">${pct(v.stats.win_rate)}</td>
+        <td class="num">${v.stats.avg_score.toFixed(2)}</td>
+        <td class="num">${v.stats.avg_placement.toFixed(2)}</td>
+      </tr>`).join('');
+    return `
+      <div class="tier-block">
+        <h3>${label}</h3>
+        <table class="variant-table">
+          <thead><tr><th>Variante</th><th>Win rate</th><th>Score moyen</th><th>Classement</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+}
+
+async function openSettings() {
+  sliderOptions = await api('/api/slider_options');
+  renderSettingsPanel();
+  $('settings-overlay').style.display = 'flex';
+}
+
+function closeSettings() { $('settings-overlay').style.display = 'none'; }
+
+$('settings-btn').addEventListener('click', openSettings);
+$('settings-cancel').addEventListener('click', closeSettings);
+$('settings-overlay').addEventListener('click', (e) => { if (e.target.id === 'settings-overlay') closeSettings(); });
+
+$('settings-save').addEventListener('click', async () => {
+  const cfg = {};
+  for (const tier of TIER_ORDER) {
+    cfg[tier] = Array.from(container_checked(tier));
+  }
+  await api('/api/slider_config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cfg),
+  });
+  closeSettings();
+  await refreshLevels();
+});
+
+function container_checked(tier) {
+  const boxes = document.querySelectorAll(`#settings-tiers input[type=checkbox][data-tier="${tier}"]:checked`);
+  return Array.from(boxes).map(b => b.dataset.id);
 }
 
 async function startGame() {

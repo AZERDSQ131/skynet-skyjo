@@ -1,16 +1,16 @@
 # Niveaux Skynet — origine des checkpoints
 
-> **⚠️ Un run `train_v3` (nouvelle architecture, `OBS_DIM = 1701`) est
-> terminé et disponible dans `checkpoints/levels_v3/` +
-> `checkpoints/skynet_v3.pt`, mais n'est PAS encore utilisé par le
-> serveur.** Le serveur actuellement en cours d'exécution charge
-> toujours `checkpoints/levels/level_*.pt`, qui correspondent à
-> l'ancienne architecture (`OBS_DIM = 1689`, run `train_v2`/`train_refine`
-> ci-dessous). Les deux lignées sont volontairement gardées côte à côte
-> dans des dossiers séparés le temps de comparer/valider — ne pas copier
-> `levels_v3/*.pt` par-dessus `levels/*.pt` ni redémarrer le serveur sans
-> décision explicite de l'utilisateur, sous peine de crash au chargement
-> (`load_state_dict`) si jamais les deux architectures se mélangent.
+> **Le serveur sert maintenant plusieurs lignées à la fois**, via un
+> panneau de réglages (bouton "⚙️ Réglages" dans l'interface) qui permet
+> de choisir, palier par palier (Débutant/Intermédiaire/Avancé/Expert),
+> quelle variante (v2/v3/v4) utiliser. La configuration est persistée
+> dans `checkpoints/levels/slider_config.json`. Comme v2 (`OBS_DIM=1689`)
+> et v3/v4 (`OBS_DIM=1701`) ne sont pas binairement compatibles,
+> `server.py` construit un réseau avec la bonne dimension par variante
+> (`skynet/env/legacy_v2_obs.py` reconstruit l'encodage v2 à l'identique
+> pour cette raison — ne pas le modifier, ça casserait le chargement des
+> checkpoints v2). Défauts actuels : Débutant=v3, Intermédiaire=v3,
+> Avancé=v2, Expert=v2+v3 (toutes les deux exposées sur le curseur).
 
 Architecture courante (v2) : pioche en deux temps (tirer puis décider
 en connaissant la valeur) + comptage de cartes dans l'observation,
@@ -54,12 +54,32 @@ aléatoire : 100 % de victoires, score moyen 20.31.
 lignée (utilisable avec `--resume` pour continuer/raffiner ce run
 précis, incompatible avec `../skynet.pt` de la lignée v2).
 
-Pour basculer le serveur sur cette lignée : remplacer les fichiers dans
-`checkpoints/levels/` par ceux de `checkpoints/levels_v3/` (ou changer
-`LEVELS_DIR` dans `server.py`), puis redémarrer le serveur. À faire
-uniquement sur décision explicite de l'utilisateur, après comparaison.
+Benchmarks (150 parties vs aléatoire, seed=42) : Débutant 68,7% win /
+43,53 score moyen ; Intermédiaire 90,7% / 32,90 ; Avancé 97,3% / 24,30 ;
+Expert 98,7% / 19,89. Face-à-face 1v1 vs Expert v2 (200 parties) : v3
+gagne 57,0%, v2 41,0%, 2 égalités.
+
+## Lignée v4 (`OBS_DIM = 1701`, tête auxiliaire de classement)
+
+Run `train_v4` : warm-start depuis les poids v3 Expert
+(`checkpoints/skynet_v3.pt` copié vers `checkpoints/skynet_v4.pt` puis
+`--resume`, tronc/politique/valeur repris tels quels, seule la nouvelle
+tête `rank_head` — ajoutée dans `network.py` — part de zéro), 700
+itérations, entropie basse (0.004→0.0008), perte auxiliaire de
+classement (`--rank-coef 0.1`, cross-entropie sur le rang final,
+masquée selon le nombre de joueurs). Un seul niveau produit (Expert),
+pas de ladder Débutant→Avancé pour cette lignée.
+
+| Fichier (`checkpoints/levels_v4/`) | Correspondrait à | Origine |
+|---|---|---|
+| `level_4.pt` | Expert | Run `train_v4`, itération 700/700 (warm-start depuis v3 Expert) |
+
+Benchmarks : 99,3% win vs aléatoire / score moyen 18,49. Face-à-face 1v1
+vs Expert v3 (200 parties) : v4 gagne 56,5%, v3 43,0%, 1 égalité — gain
+du même ordre que v3 vs v2, la tête de classement apporte un progrès
+mesurable mais modeste.
 
 Pour ajouter un niveau : relancer `train.py` avec `--milestones` pointant
 sur les itérations voulues, ou copier `checkpoints/skynet.pt` vers le
 fichier de niveau cible une fois l'entraînement terminé — et mettre à
-jour ce tableau.
+jour ce tableau et `VARIANTS` dans `server.py`.
