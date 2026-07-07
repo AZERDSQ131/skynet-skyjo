@@ -1,0 +1,1204 @@
+<title>Skyjo — Affronte Skynet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @property --dot-color {
+    syntax: '<color>';
+    inherits: false;
+    initial-value: #6d4fc4;
+  }
+
+  :root {
+    --cream: #fff8ec;
+    --panel: #ffffff;
+    --line: #ecdfc8;
+    --ink: #2b2620;
+    --muted: #9c8f7d;
+
+    --navy: #1f3f8f;    /* -2, -1 */
+    --sky: #29b6d8;     /* 0 */
+    --green: #2fae4e;   /* 1 à 4 */
+    --yellow: #f2b705;  /* 5 à 8 */
+    --red: #e2513f;     /* 9 à 12 */
+    --back: #f5762b;    /* dos de carte */
+    --gold: #f2b705;
+
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Nunito', sans-serif;
+  }
+
+  h1, h2, h3, button, .display { font-family: 'Fredoka', sans-serif; }
+
+  .app { max-width: 1100px; margin: 0 auto; padding: 24px 20px 70px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 22px; flex-wrap: wrap; gap: 10px;
+  }
+  header h1 {
+    margin: 0; font-size: 26px; font-weight: 700; color: var(--ink);
+    display: flex; align-items: center; gap: 10px;
+  }
+  header h1 .robot { filter: drop-shadow(0 2px 0 rgba(0,0,0,.08)); }
+  header .subtitle { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  #turn-banner {
+    background: var(--panel); border: 2px solid var(--line);
+    border-radius: 999px; padding: 10px 20px;
+    font-weight: 700; font-size: 14px;
+    box-shadow: 0 3px 0 var(--line);
+    display: flex; align-items: center; gap: 8px;
+  }
+  #turn-banner.you { border-color: var(--green); color: #1d7a37; box-shadow: 0 3px 0 var(--green); }
+  #turn-banner.ai { border-color: var(--red); color: #b23325; box-shadow: 0 3px 0 var(--red); }
+  #turn-banner.final { border-color: var(--gold); color: #96780a; box-shadow: 0 3px 0 var(--gold); }
+
+  /* ---- setup ---- */
+  #setup {
+    background: var(--panel); border-radius: 24px; padding: 30px;
+    box-shadow: 0 4px 0 var(--line);
+  }
+  #setup h2 { margin-top: 0; font-size: 19px; }
+  .step { margin-bottom: 26px; }
+  .step-label { font-weight: 800; font-size: 13px; letter-spacing: .02em; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+
+  .stepper { display: flex; gap: 8px; flex-wrap: wrap; }
+  .n-btn {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--cream); border: 2px solid var(--line); color: var(--ink);
+    font-weight: 700; font-size: 16px; cursor: pointer;
+    transition: transform .1s;
+  }
+  .n-btn:hover { transform: translateY(-2px); }
+  .n-btn.active { background: var(--green); border-color: var(--green); color: #fff; }
+
+  .seat-rows { display: flex; flex-direction: column; gap: 8px; }
+  .seat-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--cream); border: 2px solid var(--line); border-radius: 14px;
+    padding: 10px 14px;
+  }
+  .seat-row .seat-name { font-weight: 700; }
+  .toggle-pill { display: flex; border-radius: 999px; overflow: hidden; border: 2px solid var(--line); }
+  .toggle-pill button {
+    border: none; background: var(--panel); color: var(--muted);
+    padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .toggle-pill button.active.human { background: var(--sky); color: #fff; }
+  .toggle-pill button.active.ai { background: var(--red); color: #fff; }
+  .mode-toggle {
+    display: flex; width: 100%; gap: 10px;
+    margin-bottom: 22px;
+  }
+  .mode-toggle button {
+    flex: 1; border: 2px solid var(--line); border-radius: 16px;
+    background: var(--panel); color: var(--muted);
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 22px;
+    padding: 18px 12px; cursor: pointer;
+    box-shadow: 0 4px 0 var(--line);
+    transition: transform .1s, box-shadow .1s, background .2s, color .2s, border-color .2s;
+  }
+  .mode-toggle button:hover { transform: translateY(-2px); }
+  .mode-toggle button:active { transform: translateY(1px); }
+  .mode-toggle button.active#mode-play { background: var(--green); border-color: #1d7a37; color: #fff; box-shadow: 0 4px 0 #1d7a37; }
+  .mode-toggle button.active#mode-cheat { background: var(--red); border-color: #a5372a; color: #fff; box-shadow: 0 4px 0 #a5372a; }
+
+  .level-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 8px; border-radius: 999px;
+    background: var(--line); outline: none; margin-top: 6px;
+  }
+  .level-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--green); border: 3px solid #fff;
+    box-shadow: 0 2px 0 rgba(0,0,0,.15); cursor: pointer;
+  }
+  .level-slider::-moz-range-thumb {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--green); border: 3px solid #fff;
+    box-shadow: 0 2px 0 rgba(0,0,0,.15); cursor: pointer;
+  }
+  .level-slider-label {
+    margin-top: 10px; font-weight: 800; font-size: 15px; color: var(--ink);
+  }
+
+  /* ---- power slider (niveau de conseil) : piste pilule + trame de points ---- */
+  .power-slider { margin-top: 10px; padding: 0 2px; }
+  .power-track {
+    position: relative; height: 34px; cursor: pointer;
+  }
+  .power-track-inner {
+    position: absolute; inset: 0; border-radius: 999px; overflow: hidden;
+    background: linear-gradient(90deg, #e9e7ef, #efeef4);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.10);
+  }
+  .power-dots {
+    --dot-color: #6d4fc4;
+    position: absolute; top: -8px; left: -8px; right: -8px; bottom: -8px;
+    background-repeat: repeat;
+    animation: dots-drift 0.9s linear infinite;
+  }
+  @keyframes dots-drift {
+    from { background-position: 0 0; }
+    to { background-position: -96px 0; }
+  }
+  .power-thumb {
+    position: absolute; top: 50%; width: 30px; height: 30px; border-radius: 50%;
+    background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.05);
+    transform: translate(-50%, -50%); z-index: 5;
+    transition: left .4s cubic-bezier(.34, 1.2, .4, 1);
+  }
+  .power-labels { position: relative; height: 16px; margin-top: 8px; }
+  .power-labels span {
+    position: absolute; top: 0; transform: translateX(-50%);
+    font-family: 'Fredoka', sans-serif; font-size: 11px; font-weight: 700; color: var(--muted);
+    white-space: nowrap; transition: color .3s;
+  }
+  .power-labels span.active { color: var(--dot-color-active, #6d4fc4); }
+
+  .cta {
+    background: var(--green); color: #fff; border: none; border-radius: 999px;
+    padding: 14px 32px; font-size: 15px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 0 #1d7a37;
+    transition: transform .1s, box-shadow .1s;
+  }
+  .cta:hover { transform: translateY(-2px); }
+  .cta:active { transform: translateY(1px); box-shadow: 0 2px 0 #1d7a37; }
+  .cta.ghost { background: var(--panel); color: var(--ink); box-shadow: 0 4px 0 var(--line); border: 2px solid var(--line); }
+
+  /* ---- table (plateau tournant) ---- */
+  #table-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 760px;
+    height: 520px;
+    margin: 0 auto 16px;
+    background: radial-gradient(ellipse at center, #fdeccb 0%, #f5dca0 65%, #eccb7e 100%);
+    border-radius: 50%;
+    border: 10px solid #e3bd5e;
+    box-shadow: inset 0 0 50px rgba(120,90,20,.12), 0 4px 0 var(--line);
+  }
+  @media (max-width: 700px) {
+    #table-wrap { height: 660px; border-radius: 32px; }
+  }
+
+  #table-center {
+    position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%);
+    display: flex; gap: 10px; z-index: 2;
+  }
+  #table-center .panel { padding: 8px 10px; box-shadow: 0 2px 0 var(--line); background: rgba(255,255,255,.85); }
+  #table-center .p-label { font-size: 9px; margin-bottom: 4px; }
+  #table-center .tile { width: 42px; height: 56px; font-size: 15px; }
+  #table-center .count { font-size: 13px; }
+
+  .seat-slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    transition: left .7s cubic-bezier(.4,0,.2,1), top .7s cubic-bezier(.4,0,.2,1),
+                width .7s cubic-bezier(.4,0,.2,1), font-size .7s ease;
+    z-index: 3;
+  }
+  .seat-slot.front { z-index: 6; }
+
+  .seat-card {
+    background: var(--panel); border-radius: var(--radius);
+    border: 2px solid var(--line); padding: 0.55em;
+    box-shadow: 0 3px 0 var(--line);
+    transition: border-color .3s, box-shadow .3s;
+  }
+  .seat-slot.front .seat-card {
+    border-color: var(--gold);
+    box-shadow: 0 4px 0 var(--gold), 0 0 0 4px rgba(242,183,5,.25);
+  }
+  .seat-card .seat-header {
+    display: flex; align-items: center; gap: 6px; font-weight: 700;
+    font-size: 0.78em; margin-bottom: 0.5em; white-space: nowrap;
+  }
+
+  .grid12 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .cell {
+    aspect-ratio: 3 / 4; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 0.85em;
+    color: #fff;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.15);
+  }
+
+  .cell.hidden {
+    background: var(--back);
+    background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.14) 0 6px, transparent 6px 12px);
+    color: rgba(255,255,255,.85);
+  }
+  .cell.removed { background: transparent; box-shadow: none; border: 2px dashed var(--line); color: var(--muted); font-size: 12px; }
+  .cell.removed::after { content: "✓"; }
+  .cell.v-navy { background: var(--navy); }
+  .cell.v-sky { background: var(--sky); }
+  .cell.v-green { background: var(--green); }
+  .cell.v-yellow { background: var(--yellow); color: #5a4400; }
+  .cell.v-red { background: var(--red); }
+
+  .cell.selectable { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+  .cell.selectable:hover {
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.15), 0 0 0 3px var(--gold);
+    transform: scale(1.06);
+  }
+
+  /* ---- animation de pioche ---- */
+  #draw-overlay {
+    position: fixed; inset: 0; z-index: 95;
+    background: rgba(43,38,32,0);
+    pointer-events: none;
+    transition: background .3s ease;
+  }
+  #draw-overlay.show { background: rgba(43,38,32,.35); pointer-events: auto; }
+
+  #draw-card {
+    position: fixed; left: 50%; top: 50%;
+    width: 170px; height: 225px; border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 66px; color: #fff;
+    box-shadow: 0 14px 40px rgba(0,0,0,.35), inset 0 -6px 0 rgba(0,0,0,.15);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.3);
+    transition: left .6s cubic-bezier(.4,0,.2,1), top .6s cubic-bezier(.4,0,.2,1),
+                width .6s cubic-bezier(.4,0,.2,1), height .6s cubic-bezier(.4,0,.2,1),
+                font-size .6s cubic-bezier(.4,0,.2,1), opacity .3s ease,
+                transform .5s cubic-bezier(.34,1.56,.64,1);
+    z-index: 96;
+  }
+
+  /* ---- carte en main (sur le côté) ---- */
+  #side-card {
+    display: none;
+    position: fixed; right: 22px; top: 50%; transform: translateY(-50%);
+    flex-direction: column; align-items: center; gap: 6px;
+    background: var(--panel); border: 2px solid var(--yellow); border-radius: 14px;
+    padding: 10px 14px; box-shadow: 0 3px 0 var(--line);
+    z-index: 40;
+  }
+  #side-card.show { display: flex; }
+  #side-card .p-label { margin: 0; }
+  #side-card .tile {
+    width: 60px; height: 80px; font-size: 26px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fredoka', sans-serif; font-weight: 700; color: #fff;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.15);
+  }
+
+  /* ---- infobulle d'action ---- */
+  #hover-label {
+    display: none;
+    position: fixed; z-index: 97; pointer-events: none;
+    background: var(--ink); color: #fff;
+    font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 12px;
+    padding: 5px 10px; border-radius: 8px;
+    box-shadow: 0 3px 8px rgba(0,0,0,.25);
+    transform: translate(14px, 14px);
+  }
+
+  /* ---- console ---- */
+  .panel { background: var(--panel); border-radius: var(--radius); border: 2px solid var(--line); padding: 14px; box-shadow: 0 3px 0 var(--line); }
+  .panel .p-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; letter-spacing: .03em; }
+  .pile { display: flex; align-items: center; gap: 12px; }
+  .pile .tile { width: 56px; height: 74px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 22px; color: #fff; box-shadow: inset 0 -3px 0 rgba(0,0,0,.15); }
+  .pile .count { font-weight: 800; font-size: 20px; }
+  .pile .count small { display: block; font-weight: 600; font-size: 11px; color: var(--muted); }
+
+  .pile-target.selectable { cursor: pointer; transition: transform .15s, box-shadow .15s; }
+  .pile-target.selectable:hover {
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.15), 0 0 0 3px var(--gold);
+    transform: scale(1.06);
+  }
+
+  /* ---- mode triche ---- */
+  #cheat-view { background: var(--panel); border-radius: 24px; padding: 24px; box-shadow: 0 4px 0 var(--line); }
+  .cheat-hint { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 14px 0; }
+
+  #cheat-opponent-boards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+  .cheat-board {
+    background: var(--cream); border: 2px solid var(--line); border-radius: 14px;
+    padding: 10px; width: 168px;
+  }
+  .cheat-board .board-title {
+    font-weight: 800; font-size: 12px; margin-bottom: 8px; color: var(--muted);
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  #cheat-mine-wrap {
+    background: var(--panel); border: 3px solid var(--green); border-radius: 20px;
+    padding: 18px; box-shadow: 0 4px 0 #1d7a37; margin-bottom: 18px;
+  }
+  #cheat-mine-wrap .board-title {
+    font-weight: 800; font-size: 15px; margin-bottom: 12px; color: #1d7a37;
+    display: flex; align-items: center; gap: 6px;
+  }
+  #cheat-mine-wrap .grid12 { max-width: 460px; margin: 0 auto; gap: 8px; }
+  #cheat-mine-wrap .cell { font-size: 20px; }
+
+  .editable-cell { cursor: pointer; transition: transform .1s, box-shadow .15s; }
+  .editable-cell:hover { box-shadow: inset 0 -3px 0 rgba(0,0,0,.15), 0 0 0 3px var(--sky); transform: scale(1.05); }
+  .editable-cell.recommended {
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.15), 0 0 0 4px var(--gold) !important;
+    animation: cell-pulse-slow 1.2s infinite;
+  }
+  @keyframes cell-pulse-slow { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+  #cheat-console { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+  #cheat-console input[type="number"] { width: 70px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 8px; font-size: 14px; }
+  #cheat-console label { font-weight: 700; font-size: 13px; }
+
+  #cheat-recommendation:not(:empty) {
+    margin-top: 14px; display: inline-flex; align-items: center;
+    background: var(--panel); border: 2px solid var(--green); border-radius: 999px;
+    padding: 10px 20px; font-weight: 700; font-size: 14px; color: #1d7a37;
+    box-shadow: 0 3px 0 var(--green);
+  }
+
+  #value-picker {
+    display: none; position: fixed; z-index: 99;
+    grid-template-columns: repeat(4, 44px); gap: 6px;
+    background: var(--panel); border: 2px solid var(--line); border-radius: 14px;
+    padding: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  }
+  #value-picker button {
+    width: 44px; height: 40px; border-radius: 8px; border: none;
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer;
+    background: var(--cream); color: var(--ink);
+  }
+  #value-picker button.hidden-btn { grid-column: span 4; background: var(--back); color: #fff; }
+  #value-picker button.removed-btn { grid-column: span 4; background: var(--line); color: var(--ink); }
+
+  /* ---- end overlay ---- */
+  #end-overlay { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(43,38,32,.55); align-items: center; justify-content: center; }
+  #end-card { background: var(--panel); border-radius: 22px; padding: 30px 34px; min-width: 320px; text-align: center; box-shadow: 0 8px 0 var(--line); }
+  #end-card h2 { margin-top: 0; }
+  #podium { list-style: none; padding: 0; margin: 20px 0; text-align: left; }
+  #podium li { display: flex; justify-content: space-between; padding: 8px 10px; border-radius: 10px; font-weight: 700; }
+  #podium li:nth-child(1) { background: #fff6de; }
+  #podium li.you { color: #1d7a37; }
+</style>
+
+<div class="app">
+  <header>
+    <div>
+      <h1><span class="robot">🤖</span> Skyjo <span style="color:var(--muted); font-weight:600;">vs Skynet</span></h1>
+      <div class="subtitle">Une IA entraînée par renforcement (self-play PPO)</div>
+    </div>
+    <div id="turn-banner"></div>
+  </header>
+
+  <div class="mode-toggle">
+    <button id="mode-play" class="active">🎮 Jouer</button>
+    <button id="mode-cheat">🕵️ Triche</button>
+  </div>
+
+  <div id="play-view">
+    <div id="setup">
+      <h2>Nouvelle partie</h2>
+
+      <div class="step">
+        <div class="step-label">Nombre de sièges</div>
+        <div class="stepper" id="n-selector"></div>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Qui joue à chaque siège ?</div>
+        <div class="seat-rows" id="seat-rows"></div>
+      </div>
+
+      <div class="step">
+        <div class="step-label">Niveau de Skynet</div>
+        <input type="range" id="level-slider" min="0" max="0" step="1" value="0" class="level-slider">
+        <div class="level-slider-label" id="level-slider-label"></div>
+      </div>
+
+      <button class="cta" id="start-btn">Démarrer la partie</button>
+    </div>
+
+    <div id="game" style="display:none;">
+      <div id="table-wrap">
+        <div id="table-center">
+          <div class="panel">
+            <div class="p-label">Pioche</div>
+            <div class="pile"><div class="tile pile-target" id="deck-tile" style="background:var(--back)">?</div><div class="count" id="deck-count">-</div></div>
+          </div>
+          <div class="panel">
+            <div class="p-label">Défausse</div>
+            <div class="pile"><div class="tile pile-target" id="discard-tile">-</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="cheat-view" style="display:none;">
+    <div id="cheat-setup">
+      <div class="step">
+        <div class="step-label">Nombre d'adversaires visibles</div>
+        <div class="stepper" id="cheat-n-selector"></div>
+      </div>
+      <div class="step">
+        <div class="step-label">Niveau de conseil</div>
+        <div class="power-slider">
+          <div class="power-track" id="cheat-power-track">
+            <div class="power-track-inner"><div class="power-dots"></div></div>
+            <div class="power-thumb" id="cheat-power-thumb"></div>
+          </div>
+          <div class="power-labels" id="cheat-power-labels"></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="cheat-hint">Reproduis ici l'état de ta vraie partie (tes cartes, celles visibles des adversaires, la défausse), clique une case pour la renseigner, puis demande conseil.</p>
+
+    <div id="cheat-opponent-boards"></div>
+
+    <div id="cheat-mine-wrap">
+      <div class="board-title">🧑 Ma grille</div>
+      <div class="grid12" id="cheat-mine-grid"></div>
+    </div>
+
+    <div id="cheat-console">
+      <div class="panel">
+        <div class="p-label">Défausse (carte du dessus)</div>
+        <div class="pile"><div class="tile editable-cell" id="cheat-discard-tile" data-cell="-1">?</div></div>
+      </div>
+      <div class="panel">
+        <div class="p-label">Cartes restantes en pioche</div>
+        <input type="number" id="cheat-deck-count" min="0" max="150" value="50">
+      </div>
+      <div class="panel">
+        <label><input type="checkbox" id="cheat-final-round"> Dernier tour</label>
+        <div id="cheat-final-remaining-wrap" style="display:none;">
+          Tours restants : <input type="number" id="cheat-final-remaining" min="1" value="1">
+        </div>
+      </div>
+    </div>
+
+    <button class="cta" id="cheat-advise-btn">🤖 Que dois-je faire ?</button>
+    <div id="cheat-recommendation"></div>
+  </div>
+</div>
+
+<div id="value-picker"></div>
+
+<div id="draw-overlay">
+  <div id="draw-card">?</div>
+</div>
+
+<div id="side-card">
+  <div class="p-label">En main</div>
+  <div class="tile" id="side-card-tile">?</div>
+</div>
+
+<div id="hover-label"></div>
+
+<div id="end-overlay">
+  <div id="end-card">
+    <h2>🏁 Manche terminée</h2>
+    <ol id="podium"></ol>
+    <button class="cta" id="restart-btn">Rejouer</button>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let serverState = null;
+let mode = null; // 'reveal' | 'draw_place' | 'draw_discard_reveal' | 'take_discard'
+let heldValue = null;
+let chosenN = 4;
+let seatsHuman = [true, false, false, false, false, false, false, false];
+let availableLevels = [{ level: 0, label: 'Aléatoire' }];
+let chosenLevel = 0;
+
+function valueClass(v) {
+  if (v === null || v === undefined) return '';
+  if (v <= -1) return 'v-navy';
+  if (v === 0) return 'v-sky';
+  if (v <= 4) return 'v-green';
+  if (v <= 8) return 'v-yellow';
+  return 'v-red';
+}
+
+function valueColorVar(v) {
+  if (v <= -1) return 'var(--navy)';
+  if (v === 0) return 'var(--sky)';
+  if (v <= 4) return 'var(--green)';
+  if (v <= 8) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function scoreOf(grid) {
+  return grid.reduce((sum, c) => sum + (c.state === 'revealed' ? c.value : 0), 0);
+}
+
+function cellHTML(cell, selectable) {
+  const cls = ['cell'];
+  let text = '';
+  if (cell.state === 'hidden') { cls.push('hidden'); text = '?'; }
+  else if (cell.state === 'removed') { cls.push('removed'); }
+  else { cls.push(valueClass(cell.value)); text = cell.value; }
+  if (selectable) cls.push('selectable');
+  return `<div class="${cls.join(' ')}">${text}</div>`;
+}
+
+function legalCellsFor(kind) {
+  if (!serverState) return [];
+  const ranges = { reveal: [0, 12], place_drawn: [12, 24], discard_drawn_reveal: [24, 36], take_discard: [36, 48] };
+  if (!(kind in ranges)) return [];
+  const legal = serverState.legal_actions || [];
+  const [lo, hi] = ranges[kind];
+  return legal.filter(a => a >= lo && a < hi).map(a => a - lo);
+}
+
+function getEffectiveMode() {
+  if (serverState && serverState.turn_phase === 'pending_draw') {
+    return mode === 'discard_drawn_reveal' ? 'discard_drawn_reveal' : 'place_drawn';
+  }
+  return mode || 'reveal';
+}
+
+let seatEls = {};
+
+function initTable(n) {
+  const wrap = $('table-wrap');
+  wrap.querySelectorAll('.seat-slot').forEach(el => el.remove());
+  seatEls = {};
+  for (let i = 0; i < n; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'seat-slot';
+    slot.innerHTML = `
+      <div class="seat-card">
+        <div class="seat-header"></div>
+        <div class="grid12"></div>
+      </div>
+    `;
+    wrap.appendChild(slot);
+    seatEls[i] = { slot, header: slot.querySelector('.seat-header'), grid: slot.querySelector('.grid12') };
+  }
+}
+
+function positionSeat(el, { left, top, widthPct, fontPx, front }) {
+  el.slot.style.left = left + '%';
+  el.slot.style.top = top + '%';
+  el.slot.style.width = widthPct + '%';
+  el.slot.style.fontSize = fontPx + 'px';
+  el.slot.classList.toggle('front', front);
+}
+
+function layoutTable() {
+  const n = serverState.n_players;
+  const current = serverState.current_player ?? 0;
+  const m = n - 1;
+  for (let i = 0; i < n; i++) {
+    const k = (i - current + n) % n;
+    if (k === 0) {
+      positionSeat(seatEls[i], { left: 50, top: 84, widthPct: 40, fontPx: 20, front: true });
+    } else {
+      const idx = k - 1;
+      const t = m <= 1 ? 0.5 : idx / (m - 1);
+      const left = 12 + t * 76;
+      const top = 20 - Math.sin(t * Math.PI) * 12;
+      const widthPct = Math.max(13, 30 - m * 2.2);
+      const fontPx = Math.max(9, widthPct * 0.62);
+      positionSeat(seatEls[i], { left, top, widthPct, fontPx, front: false });
+    }
+  }
+}
+
+function renderSeatContent() {
+  serverState.players.forEach(p => {
+    const el = seatEls[p.id];
+    const isFront = serverState.current_player === p.id;
+    const points = scoreOf(p.grid);
+    const name = p.is_human ? 'Joueur ' + (p.id + 1) : 'Skynet';
+    el.header.innerHTML = `<span class="icon">${p.is_human ? '🧑' : '🤖'}</span> ${name} — ${points} pts`;
+    const canAct = isFront && !serverState.done && p.is_human;
+    const effectiveMode = getEffectiveMode();
+    const selectable = canAct ? legalCellsFor(effectiveMode) : [];
+    el.grid.innerHTML = p.grid.map((c, i) => cellHTML(c, selectable.includes(i))).join('');
+    [...el.grid.children].forEach((div, i) => {
+      if (selectable.includes(i)) {
+        div.addEventListener('click', () => submitAction(effectiveMode, i));
+        div.addEventListener('mouseenter', () => showTooltip(labelForMode(effectiveMode)));
+        div.addEventListener('mouseleave', hideTooltip);
+      }
+    });
+  });
+}
+
+function renderActiveControls() {
+  const active = serverState.done ? null : serverState.players[serverState.current_player];
+  const deckTile = $('deck-tile');
+  const discardTile = $('discard-tile');
+
+  if (!active || !active.is_human) {
+    deckTile.classList.remove('selectable');
+    discardTile.classList.remove('selectable');
+    return;
+  }
+
+  const normalPhase = serverState.turn_phase !== 'pending_draw';
+  const canDraw = normalPhase && (serverState.legal_actions || []).includes(48);
+  const canTakeDiscard = normalPhase && legalCellsFor('take_discard').length > 0;
+
+  deckTile.classList.toggle('selectable', normalPhase && mode === null && canDraw);
+  discardTile.classList.toggle(
+    'selectable',
+    (normalPhase && mode === null && canTakeDiscard) ||
+    (!normalPhase && mode !== 'discard_drawn_reveal')
+  );
+}
+
+function renderConsole() {
+  $('deck-count').innerHTML = `${serverState.deck_count}<small>cartes</small>`;
+  const d = serverState.discard_top;
+  const dt = $('discard-tile');
+  dt.textContent = d === null ? '-' : d;
+  dt.className = 'tile pile-target';
+  dt.style.background = d === null ? '' : valueColorVar(d);
+  dt.style.color = d !== null && d >= 5 && d <= 8 ? '#5a4400' : '#fff';
+}
+
+function renderTurnBanner() {
+  const banner = $('turn-banner');
+  if (serverState.done) { banner.style.display = 'none'; return; }
+  banner.style.display = 'flex';
+  const active = serverState.players[serverState.current_player];
+  banner.className = active.is_human ? 'you' : 'ai';
+  let text = active.is_human ? `🧑 Joueur ${active.id + 1} à toi de jouer` : `🤖 Skynet réfléchit (siège ${active.id + 1})...`;
+  if (serverState.phase === 'final_round') {
+    banner.className = 'final';
+    text = '⏳ Dernier tour ! ' + text;
+  }
+  banner.textContent = text;
+}
+
+function render() {
+  if (Object.keys(seatEls).length !== serverState.n_players) initTable(serverState.n_players);
+  layoutTable();
+  renderSeatContent();
+  renderConsole();
+  renderTurnBanner();
+  renderActiveControls();
+  updateSideCard();
+  if (serverState.done) showEndScreen();
+}
+
+function updateSideCard() {
+  const pending = serverState.turn_phase === 'pending_draw';
+  const show = pending || mode === 'take_discard';
+  const el = $('side-card');
+  el.classList.toggle('show', show);
+  if (show) {
+    const value = pending ? serverState.pending_drawn_value : heldValue;
+    const tile = $('side-card-tile');
+    tile.textContent = value;
+    tile.style.background = valueColorVar(value);
+    tile.style.color = (value >= 5 && value <= 8) ? '#5a4400' : '#fff';
+  }
+}
+
+function labelForMode(m) {
+  return (m === 'place_drawn' || m === 'take_discard') ? 'Placer' : 'Retourner';
+}
+
+function showTooltip(text) {
+  const el = $('hover-label');
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
+function hideTooltip() {
+  $('hover-label').style.display = 'none';
+}
+
+document.addEventListener('mousemove', (e) => {
+  const el = $('hover-label');
+  if (el.style.display !== 'none') {
+    el.style.left = e.clientX + 'px';
+    el.style.top = e.clientY + 'px';
+  }
+});
+
+function showEndScreen() {
+  const rows = serverState.players.map(p => ({ id: p.id, is_human: p.is_human, score: serverState.scores[p.id] }));
+  rows.sort((a, b) => a.score - b.score);
+  const medals = ['🥇', '🥈', '🥉'];
+  $('podium').innerHTML = rows.map((r, i) => `
+    <li class="${r.is_human ? 'you' : ''}">
+      <span>${medals[i] || (i + 1) + '.'} ${r.is_human ? 'Joueur ' + (r.id + 1) : 'Skynet (siège ' + (r.id + 1) + ')'}</span>
+      <span>${r.score}</span>
+    </li>`).join('');
+  $('end-overlay').style.display = 'flex';
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+async function fetchStateAfter(promise) {
+  serverState = await promise;
+  mode = null;
+  heldValue = null;
+  render();
+}
+
+function submitAction(kind, cell) {
+  mode = null;
+  fetchStateAfter(api('/api/action', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, cell }),
+  }));
+}
+
+let animatingDraw = false;
+
+function runCardAnimation(value, onDone) {
+  const overlay = $('draw-overlay');
+  const card = $('draw-card');
+
+  card.textContent = value;
+  card.style.background = valueColorVar(value);
+  card.style.color = (value >= 5 && value <= 8) ? '#5a4400' : '#fff';
+  card.style.left = '50%';
+  card.style.top = '50%';
+  card.style.width = '170px';
+  card.style.height = '225px';
+  card.style.fontSize = '66px';
+  card.style.opacity = '0';
+  card.style.transform = 'translate(-50%, -50%) scale(.3)';
+
+  overlay.classList.add('show');
+  void card.offsetWidth; // force reflow avant l'étape "pop"
+
+  requestAnimationFrame(() => {
+    card.style.opacity = '1';
+    card.style.transform = 'translate(-50%, -50%) scale(1)';
+  });
+
+  setTimeout(() => {
+    card.style.opacity = '0';
+    card.style.transform = 'translate(-50%, -50%) scale(.15)';
+  }, 900);
+
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    animatingDraw = false;
+    onDone();
+    render();
+  }, 1450);
+}
+
+$('deck-tile').addEventListener('click', async () => {
+  if (animatingDraw || mode !== null) return;
+  if (!serverState || serverState.turn_phase !== 'normal') return;
+  if (!(serverState.legal_actions || []).includes(48)) return;
+  animatingDraw = true;
+  hideTooltip();
+  const data = await api('/api/action', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: 'draw' }),
+  });
+  if (data.error) { animatingDraw = false; return; }
+  runCardAnimation(data.pending_drawn_value, () => {
+    serverState = data;
+    mode = null;
+  });
+});
+$('deck-tile').addEventListener('mouseenter', () => {
+  if ($('deck-tile').classList.contains('selectable')) showTooltip('Piocher');
+});
+$('deck-tile').addEventListener('mouseleave', hideTooltip);
+
+$('discard-tile').addEventListener('click', () => {
+  if (animatingDraw) return;
+  if (serverState.turn_phase === 'pending_draw') {
+    if (mode !== 'discard_drawn_reveal') {
+      hideTooltip();
+      mode = 'discard_drawn_reveal';
+      render();
+    }
+  } else if (mode === null && legalCellsFor('take_discard').length > 0) {
+    animatingDraw = true;
+    hideTooltip();
+    const value = serverState.discard_top;
+    runCardAnimation(value, () => { mode = 'take_discard'; heldValue = value; });
+  }
+});
+$('discard-tile').addEventListener('mouseenter', () => {
+  const dt = $('discard-tile');
+  if (serverState && serverState.turn_phase === 'pending_draw') showTooltip('Jeter');
+  else if (dt.classList.contains('selectable')) showTooltip('Prendre');
+});
+$('discard-tile').addEventListener('mouseleave', hideTooltip);
+
+function buildNSelector() {
+  const el = $('n-selector');
+  el.innerHTML = '';
+  for (let n = 2; n <= 8; n++) {
+    const b = document.createElement('button');
+    b.className = 'n-btn' + (n === chosenN ? ' active' : '');
+    b.textContent = n;
+    b.addEventListener('click', () => { chosenN = n; buildSeatRows(); buildNSelector(); });
+    el.appendChild(b);
+  }
+}
+
+function buildSeatRows() {
+  const el = $('seat-rows');
+  el.innerHTML = '';
+  for (let i = 0; i < chosenN; i++) {
+    const row = document.createElement('div');
+    row.className = 'seat-row';
+    const isHuman = seatsHuman[i];
+    row.innerHTML = `
+      <span class="seat-name">Siège ${i + 1}</span>
+      <div class="toggle-pill">
+        <button class="human ${isHuman ? 'active' : ''}" data-i="${i}" data-v="1">🧑 Humain</button>
+        <button class="ai ${!isHuman ? 'active' : ''}" data-i="${i}" data-v="0">🤖 IA</button>
+      </div>
+    `;
+    el.appendChild(row);
+  }
+  el.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      seatsHuman[parseInt(b.dataset.i)] = b.dataset.v === '1';
+      buildSeatRows();
+    });
+  });
+}
+
+let cheatChosenLevel = 0;
+
+function renderLevelLabel() {
+  const found = availableLevels.find(l => l.level === chosenLevel);
+  $('level-slider-label').textContent = found ? found.label : '';
+}
+
+const POWER_COLORS = ['#9c8f7d', '#29b6d8', '#2fae4e', '#f2b705', '#e2513f'];
+
+function powerColorFor(idx, n) {
+  if (n <= 1) return POWER_COLORS[POWER_COLORS.length - 1];
+  const t = idx / (n - 1);
+  return POWER_COLORS[Math.min(POWER_COLORS.length - 1, Math.round(t * (POWER_COLORS.length - 1)))];
+}
+
+function shadeColor(hex, percent) {
+  const num = parseInt(hex.slice(1), 16);
+  const clamp = (v) => Math.max(0, Math.min(255, v));
+  const r = clamp((num >> 16) + Math.round(2.55 * percent));
+  const g = clamp(((num >> 8) & 0xff) + Math.round(2.55 * percent));
+  const b = clamp((num & 0xff) + Math.round(2.55 * percent));
+  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
+}
+
+function buildSquaresTile(color) {
+  const size = 8, cols = 12, rows = 7;
+  let rects = '';
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const roll = Math.random();
+      const fill = roll < 0.3 ? shadeColor(color, -22) : roll < 0.6 ? shadeColor(color, 22) : color;
+      rects += `<rect x="${col * size}" y="${row * size}" width="${size - 1}" height="${size - 1}" fill="${fill}"/>`;
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cols * size}" height="${rows * size}">${rects}</svg>`;
+  return { uri: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg), width: cols * size, height: rows * size };
+}
+
+function buildPowerLabels(idx) {
+  const n = availableLevels.length;
+  const el = $('cheat-power-labels');
+  el.innerHTML = availableLevels.map((lvl, i) => {
+    const pct = n > 1 ? (i / (n - 1)) * 100 : 50;
+    return `<span class="${i === idx ? 'active' : ''}" style="left:${pct}%">${lvl.label}</span>`;
+  }).join('');
+}
+
+function setCheatLevelIndex(idx) {
+  cheatChosenLevel = availableLevels[idx] ? availableLevels[idx].level : 0;
+  const n = availableLevels.length;
+  const pct = n > 1 ? (idx / (n - 1)) * 100 : 100;
+  const color = powerColorFor(idx, n);
+  $('cheat-power-thumb').style.left = pct + '%';
+
+  const dotsEl = $('cheat-power-track').querySelector('.power-dots');
+  const tile = buildSquaresTile(color);
+  dotsEl.style.backgroundImage = `url("${tile.uri}")`;
+  dotsEl.style.backgroundSize = `${tile.width}px ${tile.height}px`;
+
+  // La traînée de carrés part du curseur (rond) et s'estompe vers la gauche.
+  const trailMask = `linear-gradient(90deg, transparent 0%, transparent calc(${pct}% - 60px), ` +
+    `rgba(0,0,0,.6) calc(${pct}% - 18px), #000 ${pct}%, transparent calc(${pct}% + 0.3%))`;
+  dotsEl.style.webkitMaskImage = trailMask;
+  dotsEl.style.maskImage = trailMask;
+
+  $('cheat-power-labels').style.setProperty('--dot-color-active', color);
+  buildPowerLabels(idx);
+}
+
+$('cheat-power-track').addEventListener('click', (e) => {
+  const n = availableLevels.length;
+  if (n < 2) return;
+  const rect = $('cheat-power-track').getBoundingClientRect();
+  const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  setCheatLevelIndex(Math.round(ratio * (n - 1)));
+});
+
+async function refreshLevels() {
+  try {
+    const levels = await api('/api/levels');
+    if (Array.isArray(levels) && levels.length > 0) {
+      availableLevels = levels;
+
+      const slider = $('level-slider');
+      slider.max = levels.length - 1;
+      chosenLevel = levels[levels.length - 1].level;
+      slider.value = levels.length - 1;
+      renderLevelLabel();
+
+      setCheatLevelIndex(levels.length - 1);
+    }
+  } catch (e) { /* le serveur n'est peut-être pas encore prêt */ }
+}
+
+$('level-slider').addEventListener('input', () => {
+  const idx = parseInt($('level-slider').value);
+  chosenLevel = availableLevels[idx] ? availableLevels[idx].level : 0;
+  renderLevelLabel();
+});
+
+async function startGame() {
+  $('setup').style.display = 'none';
+  $('game').style.display = 'block';
+  $('end-overlay').style.display = 'none';
+  await fetchStateAfter(api('/api/new_game', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ n_players: chosenN, seats_human: seatsHuman.slice(0, chosenN), level: chosenLevel }),
+  }));
+}
+
+$('start-btn').addEventListener('click', startGame);
+$('restart-btn').addEventListener('click', () => {
+  $('end-overlay').style.display = 'none';
+  $('game').style.display = 'none';
+  $('setup').style.display = 'block';
+  refreshLevels();
+});
+
+buildNSelector();
+buildSeatRows();
+refreshLevels();
+
+/* ============ Mode Triche (assistant pour une vraie partie) ============ */
+
+function blankCheatGrid() {
+  return Array.from({ length: 12 }, () => ({ state: 'hidden', value: null }));
+}
+
+const cheatState = {
+  nOpponents: 0,
+  mine: blankCheatGrid(),
+  opponents: [],
+  discardTop: null,
+  recommendedCell: null,
+};
+
+function setMode(m) {
+  const isCheat = m === 'cheat';
+  $('mode-play').classList.toggle('active', !isCheat);
+  $('mode-cheat').classList.toggle('active', isCheat);
+  $('play-view').style.display = isCheat ? 'none' : '';
+  $('cheat-view').style.display = isCheat ? 'block' : 'none';
+  $('turn-banner').style.display = isCheat ? 'none' : '';
+}
+$('mode-play').addEventListener('click', () => setMode('play'));
+$('mode-cheat').addEventListener('click', () => setMode('cheat'));
+
+function cheatCellHTML(gridKey, idx, cell) {
+  const cls = ['cell', 'editable-cell'];
+  let text = '';
+  if (cell.state === 'hidden') { cls.push('hidden'); text = '?'; }
+  else if (cell.state === 'removed') { cls.push('removed'); }
+  else { cls.push(valueClass(cell.value)); text = cell.value; }
+  if (gridKey === 'mine' && idx === cheatState.recommendedCell) cls.push('recommended');
+  return `<div class="${cls.join(' ')}" data-grid="${gridKey}" data-idx="${idx}">${text}</div>`;
+}
+
+function renderCheatBoards() {
+  $('cheat-mine-grid').innerHTML = cheatState.mine.map((c, i) => cheatCellHTML('mine', i, c)).join('');
+
+  const oppEl = $('cheat-opponent-boards');
+  oppEl.innerHTML = cheatState.opponents.map((grid, oi) => `
+    <div class="cheat-board">
+      <div class="board-title">🤖 Adversaire ${oi + 1}</div>
+      <div class="grid12">${grid.map((c, i) => cheatCellHTML('opp' + oi, i, c)).join('')}</div>
+    </div>
+  `).join('');
+
+  [...document.querySelectorAll('#cheat-mine-grid .editable-cell, #cheat-opponent-boards .editable-cell')].forEach(div => {
+    div.addEventListener('click', (e) => {
+      const gridKey = div.dataset.grid;
+      const idx = parseInt(div.dataset.idx);
+      const grid = gridKey === 'mine' ? cheatState.mine : cheatState.opponents[parseInt(gridKey.replace('opp', ''))];
+      openValuePicker(e.clientX, e.clientY, (value) => {
+        grid[idx] = value === null ? { state: 'hidden', value: null } : { state: 'revealed', value };
+        cheatState.recommendedCell = null;
+        $('cheat-recommendation').textContent = '';
+        renderCheatBoards();
+      }, true);
+    });
+  });
+}
+
+function openValuePicker(x, y, onPick, allowHidden) {
+  const el = $('value-picker');
+  const values = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  let html = '';
+  if (allowHidden) html += `<button class="hidden-btn" data-v="hidden">Carte cachée</button>`;
+  html += values.map(v => `<button data-v="${v}" style="background:${valueColorVar(v)}; color:${v >= 5 && v <= 8 ? '#5a4400' : '#fff'}">${v}</button>`).join('');
+  el.innerHTML = html;
+
+  const vw = window.innerWidth, vh = window.innerHeight;
+  el.style.left = Math.min(x, vw - 210) + 'px';
+  el.style.top = Math.min(y, vh - 220) + 'px';
+  el.style.display = 'grid';
+
+  el.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const v = b.dataset.v;
+      onPick(v === 'hidden' ? null : parseInt(v));
+      el.style.display = 'none';
+    });
+  });
+}
+document.addEventListener('click', (e) => {
+  const picker = $('value-picker');
+  if (picker.style.display !== 'none' && !picker.contains(e.target) && !e.target.classList.contains('editable-cell')) {
+    picker.style.display = 'none';
+  }
+});
+
+function buildCheatOpponents(n) {
+  cheatState.nOpponents = n;
+  while (cheatState.opponents.length < n) cheatState.opponents.push(blankCheatGrid());
+  cheatState.opponents.length = n;
+  renderCheatBoards();
+}
+
+function buildCheatNSelector() {
+  const el = $('cheat-n-selector');
+  el.innerHTML = '';
+  for (let n = 0; n <= 7; n++) {
+    const b = document.createElement('button');
+    b.className = 'n-btn' + (n === cheatState.nOpponents ? ' active' : '');
+    b.textContent = n;
+    b.addEventListener('click', () => {
+      buildCheatOpponents(n);
+      buildCheatNSelector();
+    });
+    el.appendChild(b);
+  }
+}
+
+$('cheat-discard-tile').addEventListener('click', (e) => {
+  openValuePicker(e.clientX, e.clientY, (value) => {
+    cheatState.discardTop = value;
+    const dt = $('cheat-discard-tile');
+    dt.textContent = value === null ? '?' : value;
+    dt.style.background = value === null ? '' : valueColorVar(value);
+    dt.style.color = (value !== null && value >= 5 && value <= 8) ? '#5a4400' : '#fff';
+  }, false);
+});
+
+$('cheat-final-round').addEventListener('change', () => {
+  $('cheat-final-remaining-wrap').style.display = $('cheat-final-round').checked ? 'block' : 'none';
+});
+
+function setCheatDiscardDisplay(value) {
+  cheatState.discardTop = value;
+  const dt = $('cheat-discard-tile');
+  dt.textContent = value === null ? '?' : value;
+  dt.style.background = value === null ? '' : valueColorVar(value);
+  dt.style.color = (value !== null && value >= 5 && value <= 8) ? '#5a4400' : '#fff';
+}
+
+async function requestAdvice(drawnValue) {
+  const payload = {
+    level: cheatChosenLevel,
+    my_grid: cheatState.mine,
+    opponents: cheatState.opponents,
+    discard_top: cheatState.discardTop,
+    deck_count: parseInt($('cheat-deck-count').value) || 0,
+    final_round: $('cheat-final-round').checked,
+    final_round_remaining: parseInt($('cheat-final-remaining').value) || 1,
+  };
+  if (drawnValue !== undefined && drawnValue !== null) payload.drawn_value = drawnValue;
+
+  const data = await api('/api/advise', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (data.error) {
+    $('cheat-recommendation').textContent = '⚠️ Impossible de conseiller (' + data.error + ').';
+    return;
+  }
+
+  if (data.action === 'take_discard') {
+    const taken = cheatState.discardTop;
+    const old = cheatState.mine[data.cell];
+    cheatState.mine[data.cell] = { state: 'revealed', value: taken };
+    setCheatDiscardDisplay(old.state === 'revealed' ? old.value : null);
+    cheatState.recommendedCell = null;
+    $('cheat-recommendation').textContent = cheatState.discardTop === null
+      ? '✅ Défausse prise et placée automatiquement. Renseigne la nouvelle carte de la défausse.'
+      : '✅ Défausse prise et placée automatiquement.';
+  } else if (data.action === 'draw') {
+    $('cheat-recommendation').textContent = '🎲 ' + data.text;
+    cheatState.recommendedCell = null;
+    const btnRect = $('cheat-advise-btn').getBoundingClientRect();
+    openValuePicker(btnRect.left, btnRect.bottom + 8, (value) => {
+      requestAdvice(value);
+    }, false);
+  } else if (data.action === 'place_drawn') {
+    cheatState.mine[data.cell] = { state: 'revealed', value: drawnValue };
+    cheatState.recommendedCell = null;
+    $('cheat-recommendation').textContent = '✅ Carte piochée (' + drawnValue + ') placée automatiquement.';
+  } else if (data.action === 'discard_drawn_reveal') {
+    setCheatDiscardDisplay(drawnValue);
+    cheatState.recommendedCell = data.cell;
+    $('cheat-recommendation').textContent = '👉 ' + data.text;
+  } else {
+    $('cheat-recommendation').textContent = '👉 ' + data.text;
+    cheatState.recommendedCell = data.cell;
+  }
+  renderCheatBoards();
+}
+
+$('cheat-advise-btn').addEventListener('click', () => {
+  if (cheatState.discardTop === null) {
+    $('cheat-recommendation').textContent = '⚠️ Renseigne d\'abord la carte de la défausse.';
+    return;
+  }
+  requestAdvice();
+});
+
+buildCheatNSelector();
+renderCheatBoards();
+</script>
