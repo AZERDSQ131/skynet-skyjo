@@ -79,6 +79,29 @@ vs Expert v3 (200 parties) : v4 gagne 56,5%, v3 43,0%, 1 égalité — gain
 du même ordre que v3 vs v2, la tête de classement apporte un progrès
 mesurable mais modeste.
 
+## Lignée v5 (`OBS_DIM = 1701`, même archi que v4, entraînement prolongé)
+
+Run `train_v5` : warm-start depuis les poids v4 Expert (Singularité 4.3)
+(`checkpoints/skynet_v4.pt` copié vers `checkpoints/skynet_v5.pt` puis
+`--resume`, `rank_head` déjà présent donc aucune clé manquante), 2000
+itérations (~1h, contre 700 pour v4), entropie 0.01→0.0005 — objectif :
+tester si le plafond observé (gains de ~55-57% en face-à-face à chaque
+lignée) vient d'un entraînement insuffisant plutôt que d'une limite
+d'architecture. Même architecture que v4 (pas de changement de code),
+seule la durée d'entraînement change.
+
+| Fichier (`checkpoints/levels_v5/`) | Correspondrait à | Origine |
+|---|---|---|
+| `level_4.pt` | Expert | Run `train_v5`, itération 2000/2000 (warm-start depuis v4 Expert) |
+
+Benchmarks : 100% win vs aléatoire / score moyen 16,75 (meilleur que les
+18,49 de v4). Face-à-face 1v1 vs Expert v4 (200 parties) : v5 gagne
+57,5%, v4 42,0%, 1 égalité — gain du même ordre que les lignées
+précédentes (55-57%), donc l'entraînement plus long aide un peu mais ne
+fait pas sauter le plafond ; confirme que les prochains gains viendront
+plus probablement d'un changement d'architecture (league training,
+mémoire récurrente) que de plus d'itérations sur cette même architecture.
+
 Pour ajouter un niveau : relancer `train.py` avec `--milestones` pointant
 sur les itérations voulues, ou copier `checkpoints/skynet.pt` vers le
 fichier de niveau cible une fois l'entraînement terminé — et mettre à
