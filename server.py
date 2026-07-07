@@ -95,8 +95,13 @@ def load_slider_config():
             out = {}
             for tier in TIERS:
                 valid_ids = {v["id"] for v in VARIANTS[tier]}
-                ordered = [i for i in cfg.get(tier, []) if i in valid_ids]
-                out[tier] = ordered or list(DEFAULT_SLIDER_CONFIG[tier])
+                raw = cfg.get(tier)
+                if raw is None:
+                    # Clé absente (ancien fichier, tier ajouté depuis) -> défaut.
+                    out[tier] = list(DEFAULT_SLIDER_CONFIG[tier])
+                else:
+                    # Liste explicitement fournie, même vide -> on la respecte.
+                    out[tier] = [i for i in raw if i in valid_ids]
             out["expert_plus"] = bool(cfg.get("expert_plus", DEFAULT_SLIDER_CONFIG["expert_plus"]))
             return out
         except (json.JSONDecodeError, OSError):
@@ -373,8 +378,7 @@ def set_slider_config():
         requested = data.get(tier, [])
         if not isinstance(requested, list):
             requested = []
-        ordered = [i for i in requested if i in valid_ids]
-        new_cfg[tier] = ordered or list(DEFAULT_SLIDER_CONFIG[tier])
+        new_cfg[tier] = [i for i in requested if i in valid_ids]
     new_cfg["expert_plus"] = bool(data.get("expert_plus", True))
     SLIDER_CONFIG = new_cfg
     save_slider_config(SLIDER_CONFIG)
