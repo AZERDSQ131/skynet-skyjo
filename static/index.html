@@ -570,6 +570,17 @@ function scoreOf(grid) {
   return grid.reduce((sum, c) => sum + (c.state === 'revealed' ? c.value : 0), 0);
 }
 
+function checkColumnAutoRemove(grid, idx) {
+  const col = idx % 4;
+  const cells = [col, col + 4, col + 8];
+  if (cells.every(i => grid[i].state === 'revealed')) {
+    const values = new Set(cells.map(i => grid[i].value));
+    if (values.size === 1) {
+      cells.forEach(i => { grid[i] = { state: 'removed', value: null }; });
+    }
+  }
+}
+
 function cellHTML(cell, selectable) {
   const cls = ['cell'];
   let text = '';
@@ -1159,6 +1170,7 @@ function renderCheatBoards() {
       const grid = gridKey === 'mine' ? cheatState.mine : cheatState.opponents[parseInt(gridKey.replace('opp', ''))];
       openValuePicker(e.clientX, e.clientY, (value) => {
         grid[idx] = value === null ? { state: 'hidden', value: null } : { state: 'revealed', value };
+        if (value !== null) checkColumnAutoRemove(grid, idx);
         cheatState.recommendedCell = null;
         $('cheat-recommendation').textContent = '';
         renderCheatBoards();
@@ -1265,6 +1277,7 @@ async function requestAdvice(drawnValue) {
     const taken = cheatState.discardTop;
     const old = cheatState.mine[data.cell];
     cheatState.mine[data.cell] = { state: 'revealed', value: taken };
+    checkColumnAutoRemove(cheatState.mine, data.cell);
     setCheatDiscardDisplay(old.state === 'revealed' ? old.value : null);
     cheatState.recommendedCell = null;
     $('cheat-recommendation').textContent = cheatState.discardTop === null
@@ -1279,6 +1292,7 @@ async function requestAdvice(drawnValue) {
     }, false);
   } else if (data.action === 'place_drawn') {
     cheatState.mine[data.cell] = { state: 'revealed', value: drawnValue };
+    checkColumnAutoRemove(cheatState.mine, data.cell);
     cheatState.recommendedCell = null;
     $('cheat-recommendation').textContent = '✅ Carte piochée (' + drawnValue + ') placée automatiquement.';
     resetCheatDeckTile();
