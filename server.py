@@ -17,60 +17,60 @@ DEVICE = torch.device("cpu")
 CHECKPOINTS_ROOT = os.environ.get("SKYNET_CHECKPOINTS_ROOT", "checkpoints")
 SLIDER_CONFIG_PATH = os.path.join(CHECKPOINTS_ROOT, "levels", "slider_config.json")
 
-TIERS = ["beginner", "intermediate", "advanced", "expert"]
+TIERS = ["beginner", "intermediate", "advanced"]
 TIER_LABELS = {
     "beginner": "Débutant",
     "intermediate": "Intermédiaire",
     "advanced": "Avancé",
-    "expert": "Expert",
 }
 
-# Variantes disponibles par palier, avec leurs benchmarks (150 parties vs
-# adversaire aléatoire, seed=42, cf. checkpoints/levels/README.md pour le
-# détail des runs d'entraînement correspondants).
-def _variant(vid, dir_, file_, label, stats):
-    is_v2 = vid == "v2"
+# Les 9 checkpoints entraînés, répartis par palier selon leur NIVEAU RÉEL
+# (numéro de version ci-dessous, basé sur le score obtenu vs un adversaire
+# aléatoire — un plus gros écart entre deux checkpoints d'une même lignée
+# donne un plus gros saut de version), pas selon la lignée d'origine.
+# Bornes utilisées : <2.0 Débutant, 2.0-3.5 Intermédiaire, >=3.5 Avancé.
+# Benchmarks : 150 parties vs adversaire aléatoire, seed=42 (cf.
+# checkpoints/levels/README.md pour le détail des runs d'entraînement).
+def _variant(vid, dir_, file_, label, stats, lineage):
+    is_legacy = lineage == "genesis"
     return {
         "id": vid, "dir": dir_, "file": file_, "label": label, "stats": stats,
-        "obs_dim": legacy_v2_obs.OBS_DIM if is_v2 else OBS_DIM,
-        "observe": legacy_v2_obs.observe if is_v2 else observe,
+        "obs_dim": legacy_v2_obs.OBS_DIM if is_legacy else OBS_DIM,
+        "observe": legacy_v2_obs.observe if is_legacy else observe,
     }
 
 
 VARIANTS = {
     "beginner": [
-        _variant("v2", "levels", "level_1.pt", "Genesis 2",
-                  {"win_rate": 0.573, "avg_score": 44.77, "avg_placement": 0.55}),
-        _variant("v3", "levels_v3", "level_1.pt", "Horizon 3",
-                  {"win_rate": 0.687, "avg_score": 43.53, "avg_placement": 0.46}),
+        _variant("genesis_10", "levels", "level_1.pt", "Genesis 1.0",
+                  {"win_rate": 0.573, "avg_score": 44.77, "avg_placement": 0.55}, "genesis"),
+        _variant("horizon_10", "levels_v3", "level_1.pt", "Horizon 1.0",
+                  {"win_rate": 0.687, "avg_score": 43.53, "avg_placement": 0.46}, "horizon"),
+        _variant("genesis_18", "levels", "level_2.pt", "Genesis 1.8",
+                  {"win_rate": 0.867, "avg_score": 35.47, "avg_placement": 0.17}, "genesis"),
     ],
     "intermediate": [
-        _variant("v2", "levels", "level_2.pt", "Genesis 2",
-                  {"win_rate": 0.867, "avg_score": 35.47, "avg_placement": 0.17}),
-        _variant("v3", "levels_v3", "level_2.pt", "Horizon 3",
-                  {"win_rate": 0.907, "avg_score": 32.90, "avg_placement": 0.10}),
+        _variant("horizon_21", "levels_v3", "level_2.pt", "Horizon 2.1",
+                  {"win_rate": 0.907, "avg_score": 32.90, "avg_placement": 0.10}, "horizon"),
+        _variant("horizon_32", "levels_v3", "level_3.pt", "Horizon 3.2",
+                  {"win_rate": 0.973, "avg_score": 24.30, "avg_placement": 0.03}, "horizon"),
+        _variant("genesis_33", "levels", "level_3.pt", "Genesis 3.3",
+                  {"win_rate": 0.980, "avg_score": 21.39, "avg_placement": 0.02}, "genesis"),
     ],
     "advanced": [
-        _variant("v2", "levels", "level_3.pt", "Genesis 2",
-                  {"win_rate": 0.980, "avg_score": 21.39, "avg_placement": 0.02}),
-        _variant("v3", "levels_v3", "level_3.pt", "Horizon 3",
-                  {"win_rate": 0.973, "avg_score": 24.30, "avg_placement": 0.03}),
-    ],
-    "expert": [
-        _variant("v2", "levels", "level_4.pt", "Genesis 2",
-                  {"win_rate": 0.980, "avg_score": 17.75, "avg_placement": 0.02}),
-        _variant("v3", "levels_v3", "level_4.pt", "Horizon 3",
-                  {"win_rate": 0.987, "avg_score": 19.89, "avg_placement": 0.01}),
-        _variant("v4", "levels_v4", "level_4.pt", "Singularité 4",
-                  {"win_rate": 0.993, "avg_score": 18.49, "avg_placement": 0.01}),
+        _variant("genesis_40", "levels", "level_4.pt", "Genesis 4.0",
+                  {"win_rate": 0.980, "avg_score": 17.75, "avg_placement": 0.02}, "genesis"),
+        _variant("horizon_40", "levels_v3", "level_4.pt", "Horizon 4.0",
+                  {"win_rate": 0.987, "avg_score": 19.89, "avg_placement": 0.01}, "horizon"),
+        _variant("singularite_43", "levels_v4", "level_4.pt", "Singularité 4.3",
+                  {"win_rate": 0.993, "avg_score": 18.49, "avg_placement": 0.01}, "singularite"),
     ],
 }
 
 DEFAULT_SLIDER_CONFIG = {
-    "beginner": ["v3"],
-    "intermediate": ["v3"],
-    "advanced": ["v2"],
-    "expert": ["v2", "v3"],
+    "beginner": ["genesis_10", "horizon_10", "genesis_18"],
+    "intermediate": ["horizon_21", "horizon_32", "genesis_33"],
+    "advanced": ["genesis_40", "horizon_40", "singularite_43"],
     "expert_plus": True,
 }
 
@@ -115,7 +115,8 @@ def save_slider_config(cfg):
 
 def build_level_meta(slider_config):
     meta = [{"level": 0, "label": "Aléatoire", "path": None, "obs_dim": None, "observe": None, "expectimax": False}]
-    last_expert_variant = None
+    last_top_tier_variant = None
+    top_tier = TIERS[-1]  # "advanced" : le palier le plus élevé, base d'Expert+
     for tier in TIERS:
         enabled = slider_config.get(tier, [])
         show_variant_name = len(enabled) > 1
@@ -130,20 +131,20 @@ def build_level_meta(slider_config):
                 "obs_dim": variant["obs_dim"], "observe": variant["observe"],
                 "expectimax": False,
             })
-            if tier == "expert":
-                last_expert_variant = variant
+            if tier == top_tier:
+                last_top_tier_variant = variant
     # expectimax.py importe directement l'observation courante (skyjo_env.observe) ;
     # Expert+ n'a donc de sens que pour une variante qui partage cette même
     # architecture d'observation (obs_dim == OBS_DIM courant).
     if (
         slider_config.get("expert_plus", True)
-        and last_expert_variant is not None
-        and last_expert_variant["obs_dim"] == OBS_DIM
+        and last_top_tier_variant is not None
+        and last_top_tier_variant["obs_dim"] == OBS_DIM
     ):
-        path = os.path.join(CHECKPOINTS_ROOT, last_expert_variant["dir"], last_expert_variant["file"])
+        path = os.path.join(CHECKPOINTS_ROOT, last_top_tier_variant["dir"], last_top_tier_variant["file"])
         meta.append({
             "level": len(meta), "label": "Expert+ (calcul)", "path": path,
-            "obs_dim": last_expert_variant["obs_dim"], "observe": last_expert_variant["observe"],
+            "obs_dim": last_top_tier_variant["obs_dim"], "observe": last_top_tier_variant["observe"],
             "expectimax": True,
         })
     return meta
