@@ -1,8 +1,19 @@
 # Niveaux Skynet — origine des checkpoints
 
+> **⚠️ Le code de `skynet/env/skyjo_env.py` a été modifié (ajout de
+> probabilités de complétion de colonne + score estimé par joueur,
+> `OBS_DIM` passé de 1689 à 1701) mais AUCUN réentraînement n'a encore
+> été lancé.** Tous les fichiers `.pt` ci-dessous, et le serveur
+> actuellement en cours d'exécution, correspondent encore à
+> l'ancienne architecture (`OBS_DIM = 1689`). Ne pas relancer/recharger
+> le serveur tant qu'un réentraînement n'a pas produit de nouveaux
+> checkpoints compatibles avec `OBS_DIM = 1701`, sous peine de crash au
+> chargement (`load_state_dict`).
+
 Architecture courante (v2) : pioche en deux temps (tirer puis décider
-en connaissant la valeur) + comptage de cartes dans l'observation.
-`OBS_DIM = 1689`, `N_ACTIONS = 49` (voir `skynet/env/skyjo_env.py`).
+en connaissant la valeur) + comptage de cartes dans l'observation,
++ probabilités de complétion de colonne et score estimé par joueur.
+`OBS_DIM = 1701`, `N_ACTIONS = 49` (voir `skynet/env/skyjo_env.py`).
 Un fichier `.pt` n'est chargeable que par un réseau construit avec ces
 mêmes dimensions — un changement d'architecture rend les anciens
 fichiers incompatibles (ils échouent au chargement plutôt que de

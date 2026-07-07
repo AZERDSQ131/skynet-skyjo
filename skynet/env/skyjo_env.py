@@ -11,7 +11,7 @@ joueurs (self-play à paramètres partagés).
 import numpy as np
 
 from .cards import CARD_COUNTS, NUM_VALUES, value_to_index
-from .game import SkyjoGame, N_CELLS, HIDDEN, REVEALED, REMOVED
+from .game import SkyjoGame, N_CELLS, N_COLS, HIDDEN, REVEALED, REMOVED, column_cells
 
 MAX_PLAYERS = 8
 N_ACTIONS = 49
@@ -32,6 +32,9 @@ OBS_DIM = (
     + NUM_VALUES  # carte piochée en attente (one-hot), 0 si aucune
     + 1  # flag "pioche en attente de décision"
     + NUM_VALUES  # comptage de cartes : fraction encore inconnue par valeur
+    + N_COLS  # proba qu'une carte inconnue complète chaque colonne (grille propre)
+    + 1  # score estimé du joueur courant (révélé + espérance des cases cachées)
+    + N_OPP_SLOTS  # score estimé de chaque adversaire (même logique)
 )
 
 
@@ -50,6 +53,47 @@ def remaining_card_counts(game):
     if game.pending_drawn_value is not None:
         seen[game.pending_drawn_value] += 1
     return {v: max(0, total - seen[v]) for v, total in CARD_COUNTS.items()}
+
+
+def _expected_unknown_value(game):
+    """Valeur moyenne d'une carte encore inconnue, pondérée par le vrai
+    comptage restant (deck + mains cachées, indistinguables)."""
+    counts = remaining_card_counts(game)
+    total = sum(counts.values())
+    if total <= 0:
+        return 0.0
+    return sum(v * c for v, c in counts.items()) / total
+
+
+def _column_completion_probs(game, player):
+    """Pour chaque colonne de la grille de `player` : probabilité qu'une
+    carte encore inconnue complète la colonne (2 cases révélées identiques,
+    1 case cachée), 0 sinon. Sert à rendre explicite le signal que le
+    réseau devait sinon déduire lui-même du comptage de cartes brut."""
+    counts = remaining_card_counts(game)
+    total = sum(counts.values())
+    grid = game.grids[player]
+    probs = np.zeros(N_COLS, dtype=np.float32)
+    if total <= 0:
+        return probs
+    for col in range(N_COLS):
+        cells = column_cells(col)
+        states = [grid[i]["state"] for i in cells]
+        if states.count(REVEALED) != 2 or states.count(HIDDEN) != 1:
+            continue
+        revealed_values = [grid[i]["value"] for i in cells if grid[i]["state"] == REVEALED]
+        if revealed_values[0] == revealed_values[1]:
+            probs[col] = counts.get(revealed_values[0], 0) / total
+    return probs
+
+
+def _estimated_player_score(game, player, expected_unknown):
+    """Score total estimé d'un joueur : cases révélées + espérance des
+    cases encore cachées (les cases supprimées valent 0, comme au score réel)."""
+    grid = game.grids[player]
+    revealed_sum = sum(c["value"] for c in grid if c["state"] == REVEALED)
+    hidden_count = sum(1 for c in grid if c["state"] == HIDDEN)
+    return revealed_sum + hidden_count * expected_unknown
 
 
 def _card_counts_remaining_frac(game):
@@ -93,7 +137,14 @@ def observe(game, player):
 
     own_vec = _encode_grid(game.grids[player], hide_values=False)
 
+    expected_unknown = _expected_unknown_value(game)
+    column_probs = _column_completion_probs(game, player)
+    own_score_est = np.array(
+        [_estimated_player_score(game, player, expected_unknown) / 50.0], dtype=np.float32
+    )
+
     opp_parts = []
+    opp_score_parts = []
     for slot in range(N_OPP_SLOTS):
         k = slot + 1
         if k < n:
@@ -101,10 +152,14 @@ def observe(game, player):
             opp_player = turn_order[opp_idx]
             active_flag = np.array([1.0], dtype=np.float32)
             grid_vec = _encode_grid(game.grids[opp_player], hide_values=True)
+            score_est = _estimated_player_score(game, opp_player, expected_unknown) / 50.0
         else:
             active_flag = np.array([0.0], dtype=np.float32)
             grid_vec = np.zeros(OWN_GRID_DIM, dtype=np.float32)
+            score_est = 0.0
         opp_parts.append(np.concatenate([active_flag, grid_vec]))
+        opp_score_parts.append(score_est)
+    opp_score_vec = np.array(opp_score_parts, dtype=np.float32)
 
     discard_vec = np.zeros(NUM_VALUES, dtype=np.float32)
     if game.discard:
@@ -133,7 +188,8 @@ def observe(game, player):
 
     obs = np.concatenate(
         [own_vec, *opp_parts, discard_vec, deck_frac, n_active_frac,
-         final_round_flag, remaining_frac, pending_vec, pending_flag, count_frac]
+         final_round_flag, remaining_frac, pending_vec, pending_flag, count_frac,
+         column_probs, own_score_est, opp_score_vec]
     )
     assert obs.shape[0] == OBS_DIM
     return obs
