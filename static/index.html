@@ -472,6 +472,10 @@
 
     <div id="cheat-console">
       <div class="panel">
+        <div class="p-label">Pioche : j'ai eu...</div>
+        <div class="pile"><div class="tile editable-cell" id="cheat-deck-tile" style="background:var(--back)">?</div></div>
+      </div>
+      <div class="panel">
         <div class="p-label">Défausse (carte du dessus)</div>
         <div class="pile"><div class="tile editable-cell" id="cheat-discard-tile" data-cell="-1">?</div></div>
       </div>
@@ -1180,16 +1184,39 @@ async function requestAdvice(drawnValue) {
     cheatState.mine[data.cell] = { state: 'revealed', value: drawnValue };
     cheatState.recommendedCell = null;
     $('cheat-recommendation').textContent = '✅ Carte piochée (' + drawnValue + ') placée automatiquement.';
+    resetCheatDeckTile();
   } else if (data.action === 'discard_drawn_reveal') {
     setCheatDiscardDisplay(drawnValue);
     cheatState.recommendedCell = data.cell;
     $('cheat-recommendation').textContent = '👉 ' + data.text;
+    resetCheatDeckTile();
   } else {
     $('cheat-recommendation').textContent = '👉 ' + data.text;
     cheatState.recommendedCell = data.cell;
   }
   renderCheatBoards();
 }
+
+function resetCheatDeckTile() {
+  const dt = $('cheat-deck-tile');
+  dt.textContent = '?';
+  dt.style.background = 'var(--back)';
+  dt.style.color = '';
+}
+
+$('cheat-deck-tile').addEventListener('click', (e) => {
+  if (cheatState.discardTop === null) {
+    $('cheat-recommendation').textContent = '⚠️ Renseigne d\'abord la carte de la défausse.';
+    return;
+  }
+  openValuePicker(e.clientX, e.clientY, (value) => {
+    const dt = $('cheat-deck-tile');
+    dt.textContent = value;
+    dt.style.background = valueColorVar(value);
+    dt.style.color = (value >= 5 && value <= 8) ? '#5a4400' : '#fff';
+    requestAdvice(value);
+  }, false);
+});
 
 $('cheat-advise-btn').addEventListener('click', () => {
   if (cheatState.discardTop === null) {
