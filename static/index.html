@@ -113,25 +113,6 @@
   .mode-toggle button.active#mode-play { background: var(--green); border-color: #1d7a37; color: #fff; box-shadow: 0 4px 0 #1d7a37; }
   .mode-toggle button.active#mode-cheat { background: var(--red); border-color: #a5372a; color: #fff; box-shadow: 0 4px 0 #a5372a; }
 
-  .level-slider {
-    -webkit-appearance: none; appearance: none;
-    width: 100%; height: 8px; border-radius: 999px;
-    background: var(--line); outline: none; margin-top: 6px;
-  }
-  .level-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 24px; height: 24px; border-radius: 50%;
-    background: var(--green); border: 3px solid #fff;
-    box-shadow: 0 2px 0 rgba(0,0,0,.15); cursor: pointer;
-  }
-  .level-slider::-moz-range-thumb {
-    width: 24px; height: 24px; border-radius: 50%;
-    background: var(--green); border: 3px solid #fff;
-    box-shadow: 0 2px 0 rgba(0,0,0,.15); cursor: pointer;
-  }
-  .level-slider-label {
-    margin-top: 10px; font-weight: 800; font-size: 15px; color: var(--ink);
-  }
 
   /* ---- power slider (niveau de conseil) : piste pilule + trame de points ---- */
   .power-slider { margin-top: 10px; padding: 0 2px; }
@@ -419,8 +400,13 @@
 
       <div class="step">
         <div class="step-label">Niveau de Skynet</div>
-        <input type="range" id="level-slider" min="0" max="0" step="1" value="0" class="level-slider">
-        <div class="level-slider-label" id="level-slider-label"></div>
+        <div class="power-slider">
+          <div class="power-track" id="level-power-track">
+            <div class="power-track-inner"><div class="power-dots"></div></div>
+            <div class="power-thumb" id="level-power-thumb"></div>
+          </div>
+          <div class="power-labels" id="level-power-labels"></div>
+        </div>
       </div>
 
       <button class="cta" id="start-btn">Démarrer la partie</button>
@@ -889,11 +875,6 @@ function buildSeatRows() {
 
 let cheatChosenLevel = 0;
 
-function renderLevelLabel() {
-  const found = availableLevels.find(l => l.level === chosenLevel);
-  $('level-slider-label').textContent = found ? found.label : '';
-}
-
 const POWER_COLORS = ['#9c8f7d', '#29b6d8', '#2fae4e', '#f2b705', '#e2513f'];
 
 function powerColorFor(idx, n) {
@@ -925,67 +906,67 @@ function buildSquaresTile(color) {
   return { uri: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg), width: cols * size, height: rows * size };
 }
 
-function buildPowerLabels(idx) {
-  const n = availableLevels.length;
-  const el = $('cheat-power-labels');
-  el.innerHTML = availableLevels.map((lvl, i) => {
-    const pct = n > 1 ? (i / (n - 1)) * 100 : 50;
-    return `<span class="${i === idx ? 'active' : ''}" style="left:${pct}%">${lvl.label}</span>`;
-  }).join('');
+function createPowerSlider(trackId, thumbId, labelsId, onSelect) {
+  const track = $(trackId);
+  const thumb = $(thumbId);
+  const labelsEl = $(labelsId);
+  const dotsEl = track.querySelector('.power-dots');
+
+  function setIndex(idx) {
+    const n = availableLevels.length;
+    const pct = n > 1 ? (idx / (n - 1)) * 100 : 100;
+    const color = powerColorFor(idx, n);
+    thumb.style.left = pct + '%';
+
+    const tile = buildSquaresTile(color);
+    dotsEl.style.backgroundImage = `url("${tile.uri}")`;
+    dotsEl.style.backgroundSize = `${tile.width}px ${tile.height}px`;
+
+    // La traînée de carrés part du curseur (rond) et s'estompe longuement vers la gauche.
+    const trailMask = `linear-gradient(90deg, transparent 0%, transparent calc(${pct}% - 340px), ` +
+      `rgba(0,0,0,.55) calc(${pct}% - 120px), #000 ${pct}%, transparent calc(${pct}% + 0.3%))`;
+    dotsEl.style.webkitMaskImage = trailMask;
+    dotsEl.style.maskImage = trailMask;
+
+    labelsEl.style.setProperty('--dot-color-active', color);
+    labelsEl.innerHTML = availableLevels.map((lvl, i) => {
+      const p = n > 1 ? (i / (n - 1)) * 100 : 50;
+      return `<span class="${i === idx ? 'active' : ''}" style="left:${p}%">${lvl.label}</span>`;
+    }).join('');
+
+    onSelect(availableLevels[idx] ? availableLevels[idx].level : 0);
+  }
+
+  track.addEventListener('click', (e) => {
+    const n = availableLevels.length;
+    if (n < 2) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    setIndex(Math.round(ratio * (n - 1)));
+  });
+
+  return { setIndex };
 }
 
-function setCheatLevelIndex(idx) {
-  cheatChosenLevel = availableLevels[idx] ? availableLevels[idx].level : 0;
-  const n = availableLevels.length;
-  const pct = n > 1 ? (idx / (n - 1)) * 100 : 100;
-  const color = powerColorFor(idx, n);
-  $('cheat-power-thumb').style.left = pct + '%';
-
-  const dotsEl = $('cheat-power-track').querySelector('.power-dots');
-  const tile = buildSquaresTile(color);
-  dotsEl.style.backgroundImage = `url("${tile.uri}")`;
-  dotsEl.style.backgroundSize = `${tile.width}px ${tile.height}px`;
-
-  // La traînée de carrés part du curseur (rond) et s'estompe longuement vers la gauche.
-  const trailMask = `linear-gradient(90deg, transparent 0%, transparent calc(${pct}% - 340px), ` +
-    `rgba(0,0,0,.55) calc(${pct}% - 120px), #000 ${pct}%, transparent calc(${pct}% + 0.3%))`;
-  dotsEl.style.webkitMaskImage = trailMask;
-  dotsEl.style.maskImage = trailMask;
-
-  $('cheat-power-labels').style.setProperty('--dot-color-active', color);
-  buildPowerLabels(idx);
-}
-
-$('cheat-power-track').addEventListener('click', (e) => {
-  const n = availableLevels.length;
-  if (n < 2) return;
-  const rect = $('cheat-power-track').getBoundingClientRect();
-  const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-  setCheatLevelIndex(Math.round(ratio * (n - 1)));
-});
+const playPowerSlider = createPowerSlider(
+  'level-power-track', 'level-power-thumb', 'level-power-labels',
+  (level) => { chosenLevel = level; }
+);
+const cheatPowerSlider = createPowerSlider(
+  'cheat-power-track', 'cheat-power-thumb', 'cheat-power-labels',
+  (level) => { cheatChosenLevel = level; }
+);
 
 async function refreshLevels() {
   try {
     const levels = await api('/api/levels');
     if (Array.isArray(levels) && levels.length > 0) {
       availableLevels = levels;
-
-      const slider = $('level-slider');
-      slider.max = levels.length - 1;
-      chosenLevel = levels[levels.length - 1].level;
-      slider.value = levels.length - 1;
-      renderLevelLabel();
-
-      setCheatLevelIndex(levels.length - 1);
+      playPowerSlider.setIndex(levels.length - 1);
+      cheatPowerSlider.setIndex(levels.length - 1);
     }
   } catch (e) { /* le serveur n'est peut-être pas encore prêt */ }
 }
-
-$('level-slider').addEventListener('input', () => {
-  const idx = parseInt($('level-slider').value);
-  chosenLevel = availableLevels[idx] ? availableLevels[idx].level : 0;
-  renderLevelLabel();
-});
 
 async function startGame() {
   $('setup').style.display = 'none';
