@@ -475,7 +475,7 @@
     <div id="cheat-opponent-boards"></div>
 
     <div id="cheat-mine-wrap">
-      <div class="board-title">🧑 Ma grille</div>
+      <div class="board-title" id="cheat-mine-title">🧑 Ma grille</div>
       <div class="grid12" id="cheat-mine-grid"></div>
     </div>
 
@@ -1142,11 +1142,12 @@ function cheatCellHTML(gridKey, idx, cell) {
 
 function renderCheatBoards() {
   $('cheat-mine-grid').innerHTML = cheatState.mine.map((c, i) => cheatCellHTML('mine', i, c)).join('');
+  $('cheat-mine-title').textContent = `🧑 Ma grille — ${scoreOf(cheatState.mine)} pts`;
 
   const oppEl = $('cheat-opponent-boards');
   oppEl.innerHTML = cheatState.opponents.map((grid, oi) => `
     <div class="cheat-board">
-      <div class="board-title">🤖 Adversaire ${oi + 1}</div>
+      <div class="board-title">🤖 Adversaire ${oi + 1} — ${scoreOf(grid)} pts</div>
       <div class="grid12">${grid.map((c, i) => cheatCellHTML('opp' + oi, i, c)).join('')}</div>
     </div>
   `).join('');
