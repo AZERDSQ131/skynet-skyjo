@@ -6,6 +6,7 @@ import random
 import torch
 from flask import Flask, jsonify, request, send_from_directory
 
+from skynet.agents.expectimax import choose_action as choose_action_expectimax
 from skynet.agents.network import ActorCriticNet
 from skynet.env.game import SkyjoGame, HIDDEN, REMOVED
 from skynet.env.skyjo_env import OBS_DIM, N_ACTIONS, observe, legal_action_mask
@@ -14,11 +15,12 @@ DEVICE = torch.device("cpu")
 LEVELS_DIR = os.environ.get("SKYNET_LEVELS_DIR", "checkpoints/levels")
 
 LEVEL_META = [
-    {"level": 0, "label": "Aléatoire", "file": None},
-    {"level": 1, "label": "Débutant", "file": "level_1.pt"},
-    {"level": 2, "label": "Intermédiaire", "file": "level_2.pt"},
-    {"level": 3, "label": "Avancé", "file": "level_3.pt"},
-    {"level": 4, "label": "Expert", "file": "level_4.pt"},
+    {"level": 0, "label": "Aléatoire", "file": None, "expectimax": False},
+    {"level": 1, "label": "Débutant", "file": "level_1.pt", "expectimax": False},
+    {"level": 2, "label": "Intermédiaire", "file": "level_2.pt", "expectimax": False},
+    {"level": 3, "label": "Avancé", "file": "level_3.pt", "expectimax": False},
+    {"level": 4, "label": "Expert", "file": "level_4.pt", "expectimax": False},
+    {"level": 5, "label": "Expert+ (calcul)", "file": "level_4.pt", "expectimax": True},
 ]
 
 app = Flask(__name__, static_folder="static", static_url_path="")
@@ -64,10 +66,14 @@ def get_policy_for_level(level):
 
 def ai_action(game, player):
     legal = sorted(game.legal_actions())
-    net = get_policy_for_level(STATE["level"])
+    level = STATE["level"]
+    net = get_policy_for_level(level)
 
     if net is None:
         return STATE["rng"].choice(legal)
+
+    if LEVEL_META[level].get("expectimax"):
+        return choose_action_expectimax(game, player, net, device=DEVICE)
 
     obs = observe(game, player)
     mask = legal_action_mask(game)
@@ -342,6 +348,8 @@ def advise():
 
     if net is None:
         action = random.choice(legal)
+    elif LEVEL_META[level].get("expectimax"):
+        action = choose_action_expectimax(game, 0, net, device=DEVICE)
     else:
         obs = observe(game, 0)
         mask = legal_action_mask(game)

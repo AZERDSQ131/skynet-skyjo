@@ -35,9 +35,11 @@ OBS_DIM = (
 )
 
 
-def _card_counts_remaining_frac(game):
-    """Pour chaque valeur, fraction des exemplaires encore inconnus (ni
-    révélés, ni défaussés) : dans la pioche ou dans une main cachée."""
+def remaining_card_counts(game):
+    """Nombre d'exemplaires de chaque valeur encore inconnus (ni révélés,
+    ni défaussés, ni la carte piochée en attente) : dans la pioche ou
+    dans une main cachée. Sert au comptage de cartes (probabilités
+    réelles de tirage), pas seulement à l'observation du réseau."""
     seen = {v: 0 for v in CARD_COUNTS}
     for grid in game.grids:
         for cell in grid:
@@ -47,11 +49,15 @@ def _card_counts_remaining_frac(game):
         seen[v] += 1
     if game.pending_drawn_value is not None:
         seen[game.pending_drawn_value] += 1
+    return {v: max(0, total - seen[v]) for v, total in CARD_COUNTS.items()}
 
+
+def _card_counts_remaining_frac(game):
+    """Pour chaque valeur, fraction des exemplaires encore inconnus."""
+    remaining = remaining_card_counts(game)
     frac = np.zeros(NUM_VALUES, dtype=np.float32)
     for v, total in CARD_COUNTS.items():
-        remaining = max(0, total - seen[v])
-        frac[value_to_index(v)] = remaining / total
+        frac[value_to_index(v)] = remaining[v] / total
     return frac
 
 
